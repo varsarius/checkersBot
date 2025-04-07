@@ -20,6 +20,11 @@ let images = {
     qa: new Image(),
     new_game_button: new Image(),
     naming: new Image(),
+    board: new Image(),
+    difficulty: new Image(),
+    your_turn: new Image(),
+    dificulty_avatar: new Image(),
+    menu_button: new Image(),
 };
 
 // Assign sources
@@ -34,6 +39,12 @@ images.profile.src = "./img/QA_button.png";
 images.qa.src = "./img/QA_button.png";
 images.new_game_button.src = "./img/new_game_button.png";
 images.naming.src = "./img/Naming.png";
+images.board.src = "./img/boarf.png";
+images.difficulty.src = "./img/buttondifficulty.png";
+images.your_turn.src = "./img/Your turn.png"
+images.dificulty_avatar.src = "./img/boarf.png";
+images.menu_button.src = "./img/menu_button.png";
+
 
 // Function to switch scenes
 let currentScene = "menu";
@@ -61,19 +72,22 @@ class Button {
         this.img = img;
     }
 
-    drow(ctx, scene) {
+    drow(ctx) {
         // Draw the button (capsule)
         if(currentScene === this.scene){
+            ctx.save(); // Save state
+
             if(this.img){
                 ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
             } else {
+                // Draw the text on the button
+
                 ctx.fillStyle = this.color;
                 ctx.beginPath();
                 ctx.roundRect(this.x, this.y, this.width, this.height, this.height / 2); // Capsule shape
                 ctx.fill();
 
-                // Draw the text on the button
-                ctx.save(); // Save state
+
 
                 ctx.textAlign = "center";
                 ctx.font = `bold ${this.fontSize}px Impact, Arial Black, Comic Sans MS`; // Thicker fonts
@@ -93,9 +107,10 @@ class Button {
 // Fill text
                 ctx.fillText(this.text, 0, 0);
 
-                ctx.restore(); // Restore canvas to normal
+
 
             }
+            ctx.restore(); // Restore canvas to normal
         }
     }
 
@@ -106,6 +121,7 @@ class Button {
 }
 
 let buttons = [
+    // menu scene
     new Button(canvas.width * 0.5 - 125, 20, 250, 250, "Flag", "menu", () => switchScene("game"), images.logo),
     new Button(20, 20, 90, 90, "Settings", "menu", () => switchScene("settings"), images.settings),
     new Button(canvas.width - 20 - 90, 20, 90, 90, "Profile", "menu", () => switchScene("profile"), images.profile),
@@ -115,6 +131,12 @@ let buttons = [
     new Button(canvas.width / 2 - 150, canvas.height / 2 + 92, 300, 70, "New Game", "menu", () => switchScene("game"), images.new_game_button, 40, "#A6BFDB", "#6A8CBB"),
     new Button(canvas.width / 2 - 150, canvas.height / 2 + 92 + 92, 300, 70, "Your Score", "menu", () => switchScene("game"), null, 40, "#A6BFDB", "#6A8CBB"),
 
+    // game scene
+    new Button(canvas.width - 170, 20, 150, 150, "Flag", "game", () => switchScene("menu"), images.logo),
+    new Button(canvas.width / 2 + 150, 270, 350, 100, "Difficulty", "game", () => switchScene("game"), images.difficulty),
+
+    new Button(30, canvas.height - 112, 300, 70, "Manu", "game", () => switchScene("menu"), images.menu_button, 40, "#A6BFDB", "#6A8CBB"),
+
     //new Button(canvas.width * 0.5 - 125, 300, 250, 70, "New Game", "menu"),
     //new Button(canvas.width * 0.5 - 125, 400, 190, 70, "New Score", "menu"),
     //new Button(canvas.width * 0.1, 60, 70, 70, "Settings", "menu"),
@@ -122,6 +144,55 @@ let buttons = [
     //new Button(canvas.width * 0.5 - 125, canvas.height-200, 250, 70, "Back", "game", () => switchScene("menu")),
 
 ]
+
+function drawProgressBar() {
+    ctx.save(); // Save the current context state
+
+    const x = canvas.width / 2 + 320; // Position
+    const y = 460;
+    const width = 350;
+    const height = 80;
+    const borderRadius = height / 2;
+    let progress = 0.69; // 69% progress
+
+    // Draw outer capsule (background with shadow)
+    ctx.save();
+    ctx.fillStyle = "white";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+    ctx.shadowBlur = 15;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 5;
+    ctx.beginPath();
+    ctx.roundRect(x - width / 2, y, width, height, borderRadius);
+    ctx.fill();
+    ctx.restore();
+
+    // Draw inner capsule (progress bar, slightly smaller)
+    const insetPadding = 6;
+    const innerHeight = height - insetPadding * 2;
+    const innerWidth = (width - insetPadding * 2) * progress;
+    const innerRadius = innerHeight / 2;
+
+    ctx.fillStyle = "#C8D093"; // Green progress
+    ctx.beginPath();
+    ctx.roundRect(
+        x - width / 2 + insetPadding,
+        y + insetPadding,
+        innerWidth,
+        innerHeight,
+        innerRadius
+    );
+    ctx.fill();
+
+    // Draw progress text
+    ctx.fillStyle = "black";
+    ctx.font = "30px Comic Sans MS";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(Math.round(progress * 100) + "%", x, y + height / 2);
+    ctx.restore(); // Restore original context state
+
+}
 
 
 function renderMenu() {
@@ -146,12 +217,20 @@ function renderMenu() {
     ctx.drawImage(images.naming, canvas.width / 2-350, 270, 700, 100);
 
 
-    buttons.forEach((button) => button.drow(ctx, "menu"));
+    buttons.forEach((button) => button.drow(ctx));
 }
 function renderGame() {
     ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas before redrawing
 
-    buttons.forEach((button) => button.drow(ctx, "menu"));
+    ctx.drawImage(images.naming, canvas.width / 2+100, 70, 220, 40);
+    ctx.drawImage(images.board, 20, 20, 580, 580);
+    ctx.drawImage(images.your_turn, canvas.width / 2 + 220, 400, 200, 50)
+
+    drawProgressBar();
+
+    buttons.forEach((button) => button.drow(ctx));
+    ctx.drawImage(images.dificulty_avatar, canvas.width / 2 + 150, 170, 90, 200)
+
 
     //drawBoard();
     //drawPieces();
