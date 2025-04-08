@@ -193,7 +193,7 @@ class Piece {
     move(x, y){
         this.x = x;
         this.y = y;
-        renderGame();
+        //renderGame();
     }
     select() {
         pieces.forEach(piece => piece.selected = false);
@@ -403,18 +403,42 @@ canvas.addEventListener("click", function(event) {
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
 
+    let pieceClicked = false;
+
+    // Check button clicks
     buttons.forEach(button => {
         if (button.scene === currentScene && button.isClicked(mouseX, mouseY)) {
             console.log("Clicked button:", button.text);
-            if (button.onClick) button.onClick(); // Call its handler
+            if (button.onClick) button.onClick();
         }
     });
+
+    // Check piece clicks
     pieces.forEach(piece => {
-        if ("game" === currentScene && piece.isClicked(mouseX, mouseY)) {
-            console.log("Clicked piece:", piece);
+        if (currentScene === "game" && piece.isClicked(mouseX, mouseY)) {
             piece.select();
+            pieceClicked = true;
         }
     });
+
+    // Handle board click for moving selected piece
+    const selectedPiece = pieces.find(p => p.selected);
+    if (selectedPiece && !pieceClicked) {
+        // Check if the click is within the board area
+        if (mouseX >= 20 && mouseX <= 600 && mouseY >= 20 && mouseY <= 600) {
+            const tileSize = 580 / 8;
+            const tileX = Math.floor((mouseX - 20) / tileSize);
+            const tileY = Math.floor((mouseY - 20) / tileSize);
+
+            // Check if the target tile is empty
+            const isTileOccupied = pieces.some(p => p.x === tileX && p.y === tileY);
+            if (!isTileOccupied) {
+                selectedPiece.move(tileX, tileY);
+                selectedPiece.selected = false; // Deselect after moving
+                renderGame();
+            }
+        }
+    }
 });
 
 canvas.addEventListener("mousemove", function(event) {
