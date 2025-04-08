@@ -2,22 +2,27 @@
 //js game framework
 // phaser js
 
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-
+// **Constants**
 const CANVAS_WIDTH = 1024;
 const CANVAS_HEIGHT = 768;
+const BOARD_SIZE = 8;
+const TILE_SIZE = 580 / BOARD_SIZE; // Approx 72.5 pixels
+const BOARD_X = 20;
+const BOARD_Y = 20;
 
+// **Canvas Setup**
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 canvas.width = CANVAS_WIDTH;
 canvas.height = CANVAS_HEIGHT;
 
-let images = {
+// **Image Resources**
+const images = {
     whiteTile: new Image(),
     blackTile: new Image(),
     redPiece: new Image(),
     blackPiece: new Image(),
     flagImage: new Image(),
-
     logo: new Image(),
     settings: new Image(),
     profile: new Image(),
@@ -30,18 +35,17 @@ let images = {
     dificulty_avatar: new Image(),
     menu_button: new Image(),
     whitePiece: new Image(),
-    blackPiece: new Image(),
     play_btn: new Image(),
     new_game_btn: new Image(),
-    your_score_btn: new Image(),
+    your_score_btn: new Image()
 };
 
-// Assign sources
-images.whiteTile.src = "./img/white_block.png";  // Light tile
-images.blackTile.src = "./img/black_block.png";  // Dark tile
-images.redPiece.src = "./img/white.png";         // Assuming this represents red pieces
-images.blackPiece.src = "./img/black.png";       // Black pieces
-images.flagImage.src = "./img/flag.png";         // Assign an actual file path
+// Assign image sources
+images.whiteTile.src = "./img/white_block.png";
+images.blackTile.src = "./img/black_block.png";
+images.redPiece.src = "./img/white.png";
+images.blackPiece.src = "./img/blackPiece.png";
+images.flagImage.src = "./img/flag.png";
 images.logo.src = "./img/logo.png";
 images.settings.src = "./img/settings_btn.png";
 images.profile.src = "./img/profile_btn.png";
@@ -50,51 +54,15 @@ images.new_game_button.src = "./img/new_game_button.png";
 images.naming.src = "./img/Naming.png";
 images.board.src = "./img/boarf.png";
 images.difficulty.src = "./img/buttondifficulty.png";
-images.your_turn.src = "./img/Your turn.png"
+images.your_turn.src = "./img/Your turn.png";
 images.dificulty_avatar.src = "./img/deda.png";
 images.menu_button.src = "./img/menu_button.png";
 images.whitePiece.src = "./img/whitePiece.png";
-images.blackPiece.src = "./img/blackPiece.png";
 images.play_btn.src = "./img/play_btn.png";
 images.new_game_btn.src = "./img/new_game_btn.png";
 images.your_score_btn.src = "./img/your_score_btn.png";
 
-
-// Piece and tile identifiers
-// const EMPTY = 0;
-// const BLACK_TILE = 1;
-// const BLACK_PIECE = 2;
-// const BLACK_KING = 3;
-// const WHITE_PIECE = 4;
-// const WHITE_KING = 5;
-//
-// const boardState = [
-//     [EMPTY, BLACK_PIECE, EMPTY, BLACK_PIECE, EMPTY, BLACK_PIECE, EMPTY, BLACK_PIECE],
-//     [BLACK_PIECE, EMPTY, BLACK_PIECE, EMPTY, BLACK_PIECE, EMPTY, BLACK_PIECE, EMPTY],
-//     [EMPTY, BLACK_PIECE, EMPTY, BLACK_PIECE, EMPTY, BLACK_PIECE, EMPTY, BLACK_PIECE],
-//     [BLACK_TILE, EMPTY, BLACK_TILE, EMPTY, BLACK_PIECE, EMPTY, BLACK_TILE, EMPTY],
-//     [EMPTY, BLACK_TILE, EMPTY, BLACK_TILE, EMPTY, BLACK_TILE, EMPTY, BLACK_TILE],
-//     [WHITE_PIECE, EMPTY, WHITE_PIECE, EMPTY, WHITE_PIECE, EMPTY, WHITE_PIECE, EMPTY],
-//     [EMPTY, WHITE_PIECE, EMPTY, WHITE_PIECE, EMPTY, WHITE_PIECE, EMPTY, WHITE_PIECE],
-//     [WHITE_PIECE, EMPTY, WHITE_PIECE, EMPTY, WHITE_PIECE, EMPTY, WHITE_PIECE, EMPTY]
-// ];
-
-
-
-
-
-
-// Function to switch scenes
-let currentScene = "menu";
-function switchScene(scene) {
-    currentScene = scene;
-    if (scene === "game") {
-        renderGame();
-    } else if (scene === "menu") {
-        renderMenu();
-    }
-}
-
+// **Button Class**
 class Button {
     constructor(x, y, width, height, text, scene, onClick = null, img = null, fontSize = 40, color = "#4CAF50", textColor = "white") {
         this.x = x;
@@ -103,189 +71,196 @@ class Button {
         this.height = height;
         this.text = text;
         this.scene = scene;
+        this.onClick = onClick;
+        this.img = img;
         this.fontSize = fontSize;
         this.color = color;
         this.textColor = textColor;
-        this.onClick = onClick;
-        this.img = img;
     }
 
-    drow(ctx) {
-        // Draw the button (capsule)
-        if(currentScene === this.scene){
-            ctx.save(); // Save state
+    draw() {
+        if (currentScene !== this.scene) return;
+        ctx.save();
+        if (this.img) {
+            ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
+        } else {
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.roundRect(this.x, this.y, this.width, this.height, this.height / 2);
+            ctx.fill();
 
-            if(this.img){
-                ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
-            } else {
-                // Draw the text on the button
-
-                ctx.fillStyle = this.color;
-                ctx.beginPath();
-                ctx.roundRect(this.x, this.y, this.width, this.height, this.height / 2); // Capsule shape
-                ctx.fill();
-
-
-
-                ctx.textAlign = "center";
-                ctx.font = `bold ${this.fontSize}px Impact, Arial Black, Comic Sans MS`; // Thicker fonts
-                ctx.fillStyle = this.textColor || "#001f4d"; // Dark blue
-                ctx.strokeStyle = "white";
-                ctx.lineWidth = 6; // Thicker border
-
-// Optional: Make the text appear wider
-                ctx.translate(this.x + this.width / 2, this.y + this.height / 1.5);
-                ctx.scale(1.15, 1); // Horizontal stretch only
-
-// Bold stroke by drawing multiple times slightly offset
-                ctx.strokeText(this.text, 0, 0);
-                ctx.strokeText(this.text, 0.5, 0);
-                ctx.strokeText(this.text, -0.5, 0);
-
-// Fill text
-                ctx.fillText(this.text, 0, 0);
-
-
-
-            }
-            ctx.restore(); // Restore canvas to normal
+            ctx.textAlign = "center";
+            ctx.font = `bold ${this.fontSize}px Impact, Arial Black, Comic Sans MS`;
+            ctx.fillStyle = this.textColor;
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 6;
+            ctx.translate(this.x + this.width / 2, this.y + this.height / 1.5);
+            ctx.scale(1.15, 1);
+            ctx.strokeText(this.text, 0, 0);
+            ctx.fillText(this.text, 0, 0);
         }
+        ctx.restore();
     }
 
     isClicked(mouseX, mouseY) {
         return mouseX >= this.x && mouseX <= this.x + this.width &&
-            mouseY >= this.y && mouseY <= this.y + this.height;
+        mouseY >= this.y && mouseY <= this.y + this.height;
     }
 }
 
-//just a draft of this Class. Need to be comfortable in managing pieces.
+    // **Piece Class**
 class Piece {
-    constructor(x, y, width, height, type, image) {
-        this.x = x; //from 1 to 8
-        this.y = y; //from 1 to 8
-        this.width = width;
-        this.height = height;
-        this.type = type;
+    constructor(tileX, tileY, type, image) {
+        this.tileX = tileX;         // Current position in tile coordinates (0-7)
+        this.tileY = tileY;
+        this.type = type;           // "black" or "white"
         this.image = image;
+        this.isKing = false;
         this.selected = false;
+        this.isMoving = false;
+        this.moveProgress = 0;      // Animation progress (0 to 1)
+        this.startTileX = 0;
+        this.startTileY = 0;
+        this.targetTileX = 0;
+        this.targetTileY = 0;
     }
-    draw(boardX, boardY){
-        ctx.save();
-        if(currentScene === "game"){
-            let padding = 5;
-            const posX = boardX + this.x * this.width + padding;
-            const posY = boardY + this.y * this.height + padding;
-            const drawWidth = this.width - padding * 2;
-            const drawHeight = this.height - padding * 2;
 
-// If selected, draw a border
-            if (this.selected) {
-                ctx.save();
-                ctx.strokeStyle = 'yellow'; // or any color you want
-                ctx.lineWidth = 4;          // thicker line for visibility
-                ctx.strokeRect(posX - 2, posY - 2, drawWidth + 4, drawHeight + 4);
-                ctx.restore();
-            }
-            ctx.drawImage(this.image, boardX + this.x * this.width + padding, boardY + this.y * this.height + padding, this.width - padding*2, this.height - padding*2);
+    draw() {
+        if (currentScene !== "game") return;
+            let pixelX, pixelY;
+        if (this.isMoving) {
+            const startX = BOARD_X + this.startTileX * TILE_SIZE;
+            const startY = BOARD_Y + this.startTileY * TILE_SIZE;
+            const endX = BOARD_X + this.targetTileX * TILE_SIZE;
+            const endY = BOARD_Y + this.targetTileY * TILE_SIZE;
+            pixelX = startX + (endX - startX) * this.moveProgress;
+            pixelY = startY + (endY - startY) * this.moveProgress;
+        } else {
+            pixelX = BOARD_X + this.tileX * TILE_SIZE;
+            pixelY = BOARD_Y + this.tileY * TILE_SIZE;
         }
-        ctx.restore();
-    }
-    move(x, y){
-        this.x = x;
-        this.y = y;
-        //renderGame();
-    }
-    select() {
-        pieces.forEach(piece => piece.selected = false);
 
-        this.selected = true;
-        console.log("as");
-        renderGame();
+        const padding = 5;
+        const drawWidth = TILE_SIZE - padding * 2;
+        const drawHeight = TILE_SIZE - padding * 2;
+        ctx.drawImage(this.image, pixelX + padding, pixelY + padding, drawWidth, drawHeight);
 
+        if (this.selected) {
+            ctx.strokeStyle = "yellow";
+            ctx.lineWidth = 4;
+            ctx.strokeRect(pixelX, pixelY, TILE_SIZE, TILE_SIZE);
+        }
     }
+
+    startMove(targetTileX, targetTileY) {
+        this.startTileX = this.tileX;
+        this.startTileY = this.tileY;
+        this.targetTileX = targetTileX;
+        this.targetTileY = targetTileY;
+        this.isMoving = true;
+        this.moveProgress = 0;
+    }
+
+    update(deltaTime) {
+        if (!this.isMoving) return;
+        this.moveProgress += deltaTime / 500; // Movement takes 500ms
+        if (this.moveProgress >= 1) {
+            this.moveProgress = 1;
+            this.isMoving = false;
+            this.tileX = this.targetTileX;
+            this.tileY = this.targetTileY;
+            // TODO: Add kinging logic here later
+        }
+    }
+
     isClicked(mouseX, mouseY) {
-        let boardX = 20
-        let boardY = 20
-        let padding = 5;
-        return mouseX >= boardX + this.x * this.width + padding && mouseX <= boardX + this.x * this.width + padding + this.width &&
-            mouseY >= boardY + this.y * this.height + padding && mouseY <= boardY + this.y * this.height + this.height + padding;
+        const pixelX = BOARD_X + this.tileX * TILE_SIZE;
+        const pixelY = BOARD_Y + this.tileY * TILE_SIZE;
+        return mouseX >= pixelX && mouseX < pixelX + TILE_SIZE &&
+        mouseY >= pixelY && mouseY < pixelY + TILE_SIZE;
+    }
+
+    select() {
+        pieces.forEach(p => p.selected = false);
+        this.selected = true;
     }
 }
 
-
-let buttons = [
-    // menu scene
+    // **Game State**
+let currentScene = "menu";
+let pieces = [];
+const buttons = [
+    // Menu Buttons
     new Button(canvas.width * 0.5 - 125, 20, 250, 250, "Flag", "menu", () => switchScene("game"), images.logo),
     new Button(20, 20, 90, 90, "Settings", "menu", () => switchScene("settings"), images.settings),
-    new Button(canvas.width - 20 - 90, 20, 90, 90, "Profile", "menu", () => switchScene("profile"), images.profile),
-    new Button(canvas.width - 20 - 90, canvas.height - 20 - 90, 90, 90, "qa", "menu", () => switchScene("qa"), images.qa),
-
+    new Button(canvas.width - 110, 20, 90, 90, "Profile", "menu", () => switchScene("profile"), images.profile),
+    new Button(canvas.width - 110, canvas.height - 110, 90, 90, "QA", "menu", () => switchScene("qa"), images.qa),
     new Button(canvas.width / 2 - 150, canvas.height / 2, 300, 70, "Play", "menu", () => switchScene("game"), images.play_btn, 40, "#A6BFDB", "#6A8CBB"),
-    new Button(canvas.width / 2 - 150, canvas.height / 2 + 92, 300, 70, "New Game", "menu", () => {switchScene("game"), resetBoard()}, images.new_game_btn, 40, "#A6BFDB", "#6A8CBB"),
-    new Button(canvas.width / 2 - 150, canvas.height / 2 + 92 + 92, 300, 70, "Your Score", "menu", () => switchScene("game"), images.your_score_btn, 40, "#A6BFDB", "#6A8CBB"),
+    new Button(canvas.width / 2 - 150, canvas.height / 2 + 92, 300, 70, "New Game", "menu", () => { switchScene("game"); resetBoard(); }, images.new_game_btn, 40, "#A6BFDB", "#6A8CBB"),
+    new Button(canvas.width / 2 - 150, canvas.height / 2 + 184, 300, 70, "Your Score", "menu", () => switchScene("game"), images.your_score_btn, 40, "#A6BFDB", "#6A8CBB"),
 
-    // game scene
+    // Game Buttons
     new Button(canvas.width - 170, 20, 150, 150, "Flag", "game", () => switchScene("menu"), images.logo),
-    new Button(canvas.width / 2 + 150, 270, 350, 100, "Difficulty", "game", () => switchScene("game"), images.difficulty),
+    new Button(canvas.width / 2 + 150, 270, 350, 100, "Difficulty", "game", null, images.difficulty),
+    new Button(10, canvas.height - 100, 300, 70, "Menu", "game", () => switchScene("menu"), images.menu_button, 40, "#A6BFDB", "#6A8CBB"),
+    new Button(340, canvas.height - 100, 300, 70, "New Game", "game", () => { switchScene("game"); resetBoard(); }, images.new_game_button, 40, "#A6BFDB", "#6A8CBB"),
+    new Button(canvas.width - 110, canvas.height - 110, 90, 90, "QA", "game", () => switchScene("qa"), images.qa)
+];
 
-    new Button(10, canvas.height - 100, 300, 70, "Manu", "game", () => switchScene("menu"), images.menu_button, 40, "#A6BFDB", "#6A8CBB"),
-    new Button(10 + 330, canvas.height - 100, 300, 70, "New Game", "game", () => switchScene("game"), images.new_game_button, 40, "#A6BFDB", "#6A8CBB"),
-    new Button(canvas.width - 20 - 90, canvas.height - 20 - 90, 90, 90, "qa", "game", () => switchScene("qa"), images.qa),
-
-    //new Button(canvas.width * 0.5 - 125, 300, 250, 70, "New Game", "menu"),
-    //new Button(canvas.width * 0.5 - 125, 400, 190, 70, "New Score", "menu"),
-    //new Button(canvas.width * 0.1, 60, 70, 70, "Settings", "menu"),
-
-    //new Button(canvas.width * 0.5 - 125, canvas.height-200, 250, 70, "Back", "game", () => switchScene("menu")),
-
-]
-
-let pieces = [];
+// **Initialization Functions**
 function resetBoard() {
-
     pieces = [
-        new Piece(1,0, 580 / 8, 580 / 8, "black", images.blackPiece),
-        new Piece(3,0, 580 / 8, 580 / 8, "black", images.blackPiece),
-        new Piece(5,0, 580 / 8, 580 / 8, "black", images.blackPiece),
-        new Piece(7,0, 580 / 8, 580 / 8, "black", images.blackPiece),
-        new Piece(0,1, 580 / 8, 580 / 8, "black", images.blackPiece),
-        new Piece(2,1, 580 / 8, 580 / 8, "black", images.blackPiece),
-        new Piece(4,1, 580 / 8, 580 / 8, "black", images.blackPiece),
-        new Piece(6,1, 580 / 8, 580 / 8, "black", images.blackPiece),
-        new Piece(1,2, 580 / 8, 580 / 8, "black", images.blackPiece),
-        new Piece(3,2, 580 / 8, 580 / 8, "black", images.blackPiece),
-        new Piece(5,2, 580 / 8, 580 / 8, "black", images.blackPiece),
-        new Piece(7,2, 580 / 8, 580 / 8, "black", images.blackPiece),
-
-        new Piece(0,7, 580 / 8, 580 / 8, "white", images.whitePiece),
-        new Piece(2,7, 580 / 8, 580 / 8, "white", images.whitePiece),
-        new Piece(4,7, 580 / 8, 580 / 8, "white", images.whitePiece),
-        new Piece(6,7, 580 / 8, 580 / 8, "white", images.whitePiece),
-        new Piece(1,6, 580 / 8, 580 / 8, "white", images.whitePiece),
-        new Piece(3,6, 580 / 8, 580 / 8, "white", images.whitePiece),
-        new Piece(5,6, 580 / 8, 580 / 8, "white", images.whitePiece),
-        new Piece(7,6, 580 / 8, 580 / 8, "white", images.whitePiece),
-        new Piece(0,5, 580 / 8, 580 / 8, "white", images.whitePiece),
-        new Piece(2,5, 580 / 8, 580 / 8, "white", images.whitePiece),
-        new Piece(4,5, 580 / 8, 580 / 8, "white", images.whitePiece),
-        new Piece(6,5, 580 / 8, 580 / 8, "white", images.whitePiece),
-
-    ]
+        // Black pieces (top)
+        new Piece(1, 0, "black", images.blackPiece),
+        new Piece(3, 0, "black", images.blackPiece),
+        new Piece(5, 0, "black", images.blackPiece),
+        new Piece(7, 0, "black", images.blackPiece),
+        new Piece(0, 1, "black", images.blackPiece),
+        new Piece(2, 1, "black", images.blackPiece),
+        new Piece(4, 1, "black", images.blackPiece),
+        new Piece(6, 1, "black", images.blackPiece),
+        new Piece(1, 2, "black", images.blackPiece),
+        new Piece(3, 2, "black", images.blackPiece),
+        new Piece(5, 2, "black", images.blackPiece),
+        new Piece(7, 2, "black", images.blackPiece),
+        // White pieces (bottom)
+        new Piece(0, 7, "white", images.whitePiece),
+        new Piece(2, 7, "white", images.whitePiece),
+        new Piece(4, 7, "white", images.whitePiece),
+        new Piece(6, 7, "white", images.whitePiece),
+        new Piece(1, 6, "white", images.whitePiece),
+        new Piece(3, 6, "white", images.whitePiece),
+        new Piece(5, 6, "white", images.whitePiece),
+        new Piece(7, 6, "white", images.whitePiece),
+        new Piece(0, 5, "white", images.whitePiece),
+        new Piece(2, 5, "white", images.whitePiece),
+        new Piece(4, 5, "white", images.whitePiece),
+        new Piece(6, 5, "white", images.whitePiece)
+    ];
 }
-resetBoard();
 
+    // **Scene Management**
+function switchScene(scene) {
+    currentScene = scene;
+}
+
+    // **Rendering Functions**
+function drawBoard() {
+    ctx.drawImage(images.board, BOARD_X, BOARD_Y, 580, 580);
+}
+
+function drawPieces() {
+    pieces.forEach(piece => piece.draw());
+}
 
 function drawProgressBar() {
-    ctx.save(); // Save the current context state
-
-    const x = canvas.width / 2 + 320; // Position
+    const x = canvas.width / 2 + 320;
     const y = 460;
     const width = 350;
     const height = 80;
     const borderRadius = height / 2;
-    let progress = 0.69; // 69% progress
+    const progress = 0.49; // Static 69% for now
 
-    // Draw outer capsule (background with shadow)
     ctx.save();
     ctx.fillStyle = "white";
     ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
@@ -297,151 +272,90 @@ function drawProgressBar() {
     ctx.fill();
     ctx.restore();
 
-    // Draw inner capsule (progress bar, slightly smaller)
-    const insetPadding = 6;
-    const innerHeight = height - insetPadding * 2;
-    const innerWidth = (width - insetPadding * 2) * progress;
-    const innerRadius = innerHeight / 2;
-
-    ctx.fillStyle = "#C8D093"; // Green progress
+    const padding = 6;
+    const innerWidth = (width - padding * 2) * progress;
+    const innerHeight = height - padding * 2;
+    ctx.fillStyle = "#C8D093";
     ctx.beginPath();
-    ctx.roundRect(
-        x - width / 2 + insetPadding,
-        y + insetPadding,
-        innerWidth,
-        innerHeight,
-        innerRadius
-    );
+    ctx.roundRect(x - width / 2 + padding, y + padding, innerWidth, innerHeight, innerHeight / 2);
     ctx.fill();
 
-    // Draw progress text
     ctx.fillStyle = "black";
     ctx.font = "30px Comic Sans MS";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(Math.round(progress * 100) + "%", x, y + height / 2);
-    ctx.restore(); // Restore original context state
-
 }
 
-function  drawBoard(x, y, width, height){
-    ctx.drawImage(images.board, 20, 20, 580, 580);
+function renderScene() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    buttons.forEach(button => button.draw());
+
+    if (currentScene === "menu") {
+        ctx.drawImage(images.naming, canvas.width / 2 - 350, 270, 700, 100);
+    } else if (currentScene === "game") {
+        drawBoard();
+        drawPieces();
+        ctx.drawImage(images.naming, canvas.width / 2 + 100, 70, 220, 40);
+        ctx.drawImage(images.your_turn, canvas.width / 2 + 220, 400, 200, 50);
+        drawProgressBar();
+        ctx.drawImage(images.dificulty_avatar, canvas.width / 2 + 150, 220, 90, 150);
+    }
 }
 
-function boardLogic(mouseX, mouseY){
-    console.log("Logic here");
-}
-function renderMenu() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas before redrawing
-    //ctx.fillStyle = "white";
-    //ctx.fillRect(0, 0, canvas.width, canvas.height); // Background for menu
+    // **Game Loop**
+let lastTime = 0;
+function gameLoop(timestamp) {
+    const deltaTime = timestamp - lastTime;
+    lastTime = timestamp;
 
-    // ctx.font = "80px Comic Sans MS";
-    // ctx.fillStyle = "white";
-    // ctx.textAlign = "center";
-    // ctx.shadowColor = "black";     // Shadow color
-    // ctx.shadowBlur = 10;           // Blur level
-    // ctx.shadowOffsetX = 4;         // Horizontal offset
-    // ctx.shadowOffsetY = 4;         // Vertical offset
-    //
-    // ctx.fillText("Checkers Bot", canvas.width / 2, 350);
-    //
-    // ctx.shadowColor = "transparent";
-    // ctx.shadowBlur = 0;
-    // ctx.shadowOffsetX = 0;
-    // ctx.shadowOffsetY = 0;
+    if (currentScene === "game") {
+        pieces.forEach(piece => piece.update(deltaTime));
+    }
 
-    ctx.drawImage(images.naming, canvas.width / 2-350, 270, 700, 100);
-
-
-
-    buttons.forEach((button) => button.drow(ctx));
-}
-function renderGame() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas before redrawing
-    drawBoard(20, 20, 580, 580);
-
-    ctx.drawImage(images.naming, canvas.width / 2+100, 70, 220, 40);
-    //ctx.drawImage(images.board, 20, 20, 580, 580);
-    ctx.drawImage(images.your_turn, canvas.width / 2 + 220, 400, 200, 50)
-
-    drawProgressBar();
-
-    buttons.forEach((button) => button.drow(ctx));
-    pieces.forEach((piece) => piece.draw(20, 20));
-
-    ctx.drawImage(images.dificulty_avatar, canvas.width / 2 + 150, 220, 90, 150)
-
-    // draw board
-
-    // manage clicks
-
-
-    // call the function for logic
-
-    //drawBoard();
-    //drawPieces();
-    //drawText(); // Draw the text after board and pieces
-    //drawFlag();
-    //drawProgressBar(); // Call progress bar function
-    //footer.draw(ctx);
+    renderScene();
+    requestAnimationFrame(gameLoop);
 }
 
-
-
-
-
-// Initialize the game after all images are loaded
-const imageLoadPromises = Object.values(images).map(image =>
-    new Promise(resolve => image.onload = resolve)
-);
-
-Promise.all(imageLoadPromises).then(renderMenu);
-
-canvas.addEventListener("click", function(event) {
+// **Event Handlers**
+canvas.addEventListener("click", (event) => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
 
-    let pieceClicked = false;
-
-    // Check button clicks
+    // Handle button clicks
     buttons.forEach(button => {
-        if (button.scene === currentScene && button.isClicked(mouseX, mouseY)) {
-            console.log("Clicked button:", button.text);
-            if (button.onClick) button.onClick();
+        if (button.scene === currentScene && button.isClicked(mouseX, mouseY) && button.onClick) {
+            button.onClick();
         }
     });
 
-    // Check piece clicks
-    pieces.forEach(piece => {
-        if (currentScene === "game" && piece.isClicked(mouseX, mouseY)) {
-            piece.select();
-            pieceClicked = true;
-        }
-    });
+    if (currentScene === "game") {
+        let pieceClicked = false;
+        // Handle piece selection
+        pieces.forEach(piece => {
+            if (piece.isClicked(mouseX, mouseY)) {
+                piece.select();
+                pieceClicked = true;
+            }
+        });
 
-    // Handle board click for moving selected piece
-    const selectedPiece = pieces.find(p => p.selected);
-    if (selectedPiece && !pieceClicked) {
-        // Check if the click is within the board area
-        if (mouseX >= 20 && mouseX <= 600 && mouseY >= 20 && mouseY <= 600) {
-            const tileSize = 580 / 8;
-            const tileX = Math.floor((mouseX - 20) / tileSize);
-            const tileY = Math.floor((mouseY - 20) / tileSize);
-
-            // Check if the target tile is empty
-            const isTileOccupied = pieces.some(p => p.x === tileX && p.y === tileY);
-            if (!isTileOccupied) {
-                selectedPiece.move(tileX, tileY);
-                selectedPiece.selected = false; // Deselect after moving
-                renderGame();
+        // Handle piece movement
+        if (!pieceClicked) {
+            const selectedPiece = pieces.find(p => p.selected);
+            if (selectedPiece) {
+                const tileX = Math.floor((mouseX - BOARD_X) / TILE_SIZE);
+                const tileY = Math.floor((mouseY - BOARD_Y) / TILE_SIZE);
+                if (isValidMove(selectedPiece, tileX, tileY)) {
+                    selectedPiece.startMove(tileX, tileY);
+                    selectedPiece.selected = false;
+                }
             }
         }
     }
 });
 
-canvas.addEventListener("mousemove", function(event) {
+canvas.addEventListener("mousemove", (event) => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
@@ -452,11 +366,36 @@ canvas.addEventListener("mousemove", function(event) {
             hovering = true;
         }
     });
-    pieces.forEach(piece => {
-        if ("game" === currentScene && piece.isClicked(mouseX, mouseY)) {
-            hovering = true;
-        }
-    });
-
+    if (currentScene === "game") {
+        pieces.forEach(piece => {
+            if (piece.isClicked(mouseX, mouseY)) {
+                hovering = true;
+            }
+        });
+    }
     canvas.style.cursor = hovering ? "pointer" : "default";
+});
+
+// **Helper Functions**
+function isValidMove(piece, targetX, targetY) {
+    // Basic placeholder: diagonal move to an empty tile
+    if (targetX < 0 || targetX >= BOARD_SIZE || targetY < 0 || targetY >= BOARD_SIZE) return false;
+    if (pieces.some(p => p.tileX === targetX && p.tileY === targetY)) return false;
+    const dx = Math.abs(targetX - piece.tileX);
+    const dy = targetY - piece.tileY;
+    if (dx !== 1 || Math.abs(dy) !== 1) return false;
+    if (piece.type === "black" && dy <= 0) return false; // Black moves down
+    if (piece.type === "white" && dy >= 0) return false; // White moves up
+    return true;
+}
+
+// **Initialization**
+const imageLoadPromises = Object.values(images).map(img =>
+    new Promise(resolve => img.onload = resolve)
+);
+
+Promise.all(imageLoadPromises).then(() => {
+    resetBoard();
+    switchScene("menu");
+    requestAnimationFrame(gameLoop);
 });
