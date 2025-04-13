@@ -1,401 +1,429 @@
-//STRATEGY design pattern
-//js game framework
-// phaser js
+// checkers.js
 
-// **Constants**
-const CANVAS_WIDTH = 1024;
-const CANVAS_HEIGHT = 768;
-const BOARD_SIZE = 8;
-const TILE_SIZE = 580 / BOARD_SIZE; // Approx 72.5 pixels
-const BOARD_X = 20;
-const BOARD_Y = 20;
+// ----------------------
+//  LOGIC LAYER (Strategy)
+// ----------------------
 
-// **Canvas Setup**
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-canvas.width = CANVAS_WIDTH;
-canvas.height = CANVAS_HEIGHT;
-
-// **Image Resources**
-const images = {
-    whiteTile: new Image(),
-    blackTile: new Image(),
-    redPiece: new Image(),
-    blackPiece: new Image(),
-    flagImage: new Image(),
-    logo: new Image(),
-    settings: new Image(),
-    profile: new Image(),
-    qa: new Image(),
-    new_game_button: new Image(),
-    naming: new Image(),
-    board: new Image(),
-    difficulty: new Image(),
-    your_turn: new Image(),
-    dificulty_avatar: new Image(),
-    menu_button: new Image(),
-    whitePiece: new Image(),
-    play_btn: new Image(),
-    new_game_btn: new Image(),
-    your_score_btn: new Image()
-};
-
-// Assign image sources
-images.whiteTile.src = "./img/white_block.png";
-images.blackTile.src = "./img/black_block.png";
-images.redPiece.src = "./img/white.png";
-images.blackPiece.src = "./img/blackPiece.png";
-images.flagImage.src = "./img/flag.png";
-images.logo.src = "./img/logo.png";
-images.settings.src = "./img/settings_btn.png";
-images.profile.src = "./img/profile_btn.png";
-images.qa.src = "./img/QA_button.png";
-images.new_game_button.src = "./img/new_game_button.png";
-images.naming.src = "./img/Naming.png";
-images.board.src = "./img/boarf.png";
-images.difficulty.src = "./img/buttondifficulty.png";
-images.your_turn.src = "./img/Your turn.png";
-images.dificulty_avatar.src = "./img/deda.png";
-images.menu_button.src = "./img/menu_button.png";
-images.whitePiece.src = "./img/whitePiece.png";
-images.play_btn.src = "./img/play_btn.png";
-images.new_game_btn.src = "./img/new_game_btn.png";
-images.your_score_btn.src = "./img/your_score_btn.png";
-
-// **Button Class**
-class Button {
-    constructor(x, y, width, height, text, scene, onClick = null, img = null, fontSize = 40, color = "#4CAF50", textColor = "white") {
-        this.x = x;
-        this.y = y;
-        this.width = width;
-        this.height = height;
-        this.text = text;
-        this.scene = scene;
-        this.onClick = onClick;
-        this.img = img;
-        this.fontSize = fontSize;
-        this.color = color;
-        this.textColor = textColor;
+class Board {
+    constructor() { this.board = this.createBoard(); }
+    createBoard() {
+        return [
+            [0,2,0,2,0,2,0,2],
+            [2,0,2,0,2,0,2,0],
+            [0,2,0,2,0,2,0,2],
+            [0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0],
+            [1,0,1,0,1,0,1,0],
+            [0,1,0,1,0,1,0,1],
+            [1,0,1,0,1,0,1,0]
+        ];
     }
+    get(r,c){return this.board[r][c];}
+    set(r,c,v){this.board[r][c]=v;}
+}
 
-    draw() {
-        if (currentScene !== this.scene) return;
+class AI {
+    constructor(board){ this.board = board; }
+    // find all capture chains from (r,c)
+    findMultiAttacks(r,c,visited=new Set()){
+        const dirs=[[ -1,-1],[-1,1],[1,-1],[1,1]];
+        let out=[];
+        for(let [dr,dc] of dirs){
+            let mr=r+dr, mc=c+dc, er=r+2*dr, ec=c+2*dc;
+            if(er<0||er>7||ec<0||ec>7) continue;
+            if(this.board.get(mr,mc)===1 && this.board.get(er,ec)===0){
+                const key=`${er},${ec}`;
+                if(visited.has(key)) continue;
+                let nv=new Set(visited); nv.add(key);
+                let fut=this.findMultiAttacks(er,ec,nv);
+                if(fut.length){
+                    for(let p of fut) out.push([[r,c],[er,ec],...p.slice(1)]);
+                } else out.push([[r,c],[er,ec]]);
+            }
+        }
+        return out;
+    }
+    getBestChain(){
+        let all=[];
+        for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+            if(this.board.get(r,c)===2){
+                let chains=this.findMultiAttacks(r,c);
+                if(chains.length) all.push(...chains);
+            }
+        }
+        if(!all.length) return null;
+        return all.reduce((a,b)=>b.length>a.length?b:a);
+    }
+    getAdvanceMove(){
+        for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+            if(this.board.get(r,c)!==2) continue;
+            for(let [dr,dc] of [[1,-1],[1,1]]){
+                let nr=r+dr,nc=c+dc;
+                if(nr<0||nr>7||nc<0||nc>7) continue;
+                if(this.board.get(nr,nc)===0) return [[r,c],[nr,nc]];
+            }
+        }
+        return null;
+    }
+    getRandomMove(){
+        let m=[];
+        for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+            if(this.board.get(r,c)!==2) continue;
+            for(let [dr,dc] of [[1,-1],[1,1]]){
+                let nr=r+dr,nc=c+dc;
+                if(nr<0||nr>7||nc<0||nc>7) continue;
+                if(this.board.get(nr,nc)===0) m.push([[r,c],[nr,nc]]);
+            }
+        }
+        if(!m.length) return null;
+        return m[Math.floor(Math.random()*m.length)];
+    }
+    getMoveChain(){
+        let c=this.getBestChain(); if(c) return c;
+        let a=this.getAdvanceMove(); if(a) return a;
+        return this.getRandomMove();
+    }
+}
+
+class PlayerLogic {
+    constructor(board){ this.board=board; }
+    findMultiAttacks(r,c,visited=new Set()){
+        const dirs=[[ -1,-1],[-1,1],[1,-1],[1,1]];
+        let out=[];
+        for(let [dr,dc] of dirs){
+            let mr=r+dr, mc=c+dc, er=r+2*dr, ec=c+2*dc;
+            if(er<0||er>7||ec<0||ec>7) continue;
+            if(this.board.get(mr,mc)===2 && this.board.get(er,ec)===0){
+                const key=`${er},${ec}`;
+                if(visited.has(key)) continue;
+                let nv=new Set(visited); nv.add(key);
+                let fut=this.findMultiAttacks(er,ec,nv);
+                if(fut.length){
+                    for(let p of fut) out.push([[r,c],[er,ec],...p.slice(1)]);
+                } else out.push([[r,c],[er,ec]]);
+            }
+        }
+        return out;
+    }
+    hasMandatory(){
+        for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+            if(this.board.get(r,c)!==1) continue;
+            if(this.findMultiAttacks(r,c).length) return true;
+        }
+        return false;
+    }
+    getMoveChain(start,end){
+        // try capture
+        let chains=this.findMultiAttacks(...start);
+        let c=chains.find(ch=>ch[1][0]===end[0]&&ch[1][1]===end[1]);
+        if(c) return c;
+        // normal
+        if(!this.hasMandatory()){
+            let [r1,c1]=start,[r2,c2]=end;
+            if(this.board.get(r1,c1)===1 && this.board.get(r2,c2)===0
+                && Math.abs(c2-c1)===1 && r2===r1-1){
+                return [[r1,c1],[r2,c2]];
+            }
+        }
+        return null;
+    }
+}
+
+
+// ----------------------
+//    UI LAYER (Canvas)
+// ----------------------
+
+const CANVAS_WIDTH=1024, CANVAS_HEIGHT=768;
+const BOARD_X=20, BOARD_Y=20, BOARD_PIX=580, TILE=BOARD_PIX/8;
+
+const canvas=document.getElementById("gameCanvas");
+const ctx=canvas.getContext("2d");
+canvas.width=CANVAS_WIDTH; canvas.height=CANVAS_HEIGHT;
+
+// load all images exactly as before
+const images={
+    whiteTile:        loadImg("./img/white_block.png"),
+    blackTile:        loadImg("./img/black_block.png"),
+    redPiece:         loadImg("./img/white.png"),
+    blackPiece:       loadImg("./img/blackPiece.png"),
+    flagImage:        loadImg("./img/flag.png"),
+    logo:             loadImg("./img/logo.png"),
+    settings:         loadImg("./img/settings_btn.png"),
+    profile:          loadImg("./img/profile_btn.png"),
+    qa:               loadImg("./img/QA_button.png"),
+    new_game_button:  loadImg("./img/new_game_button.png"),
+    naming:           loadImg("./img/Naming.png"),
+    board:            loadImg("./img/boarf.png"),
+    difficulty:       loadImg("./img/buttondifficulty.png"),
+    your_turn:        loadImg("./img/Your turn.png"),
+    dificulty_avatar: loadImg("./img/deda.png"),
+    menu_button:      loadImg("./img/menu_button.png"),
+    whitePiece:       loadImg("./img/whitePiece.png"),
+    play_btn:         loadImg("./img/play_btn.png"),
+    new_game_btn:     loadImg("./img/new_game_btn.png"),
+    your_score_btn:   loadImg("./img/your_score_btn.png")
+};
+function loadImg(src){ let i=new Image(); i.src=src; return i; }
+
+class Button {
+    constructor(x,y,w,h,text,scene,onClick=null,img=null,fs=40,c="#4CAF50",tc="white"){
+        Object.assign(this,{x,y,w,h,text,scene,onClick,img,fs,c,tc});
+    }
+    draw(){
+        if(currentScene!==this.scene) return;
         ctx.save();
-        if (this.img) {
-            ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
+        if(this.img){
+            ctx.drawImage(this.img,this.x,this.y,this.w,this.h);
         } else {
-            ctx.fillStyle = this.color;
+            ctx.fillStyle=this.c;
             ctx.beginPath();
-            ctx.roundRect(this.x, this.y, this.width, this.height, this.height / 2);
+            ctx.roundRect(this.x,this.y,this.w,this.h,this.h/2);
             ctx.fill();
-
-            ctx.textAlign = "center";
-            ctx.font = `bold ${this.fontSize}px Impact, Arial Black, Comic Sans MS`;
-            ctx.fillStyle = this.textColor;
-            ctx.strokeStyle = "white";
-            ctx.lineWidth = 6;
-            ctx.translate(this.x + this.width / 2, this.y + this.height / 1.5);
-            ctx.scale(1.15, 1);
-            ctx.strokeText(this.text, 0, 0);
-            ctx.fillText(this.text, 0, 0);
+            ctx.textAlign="center";
+            ctx.font=`bold ${this.fs}px Impact, Arial Black, Comic Sans MS`;
+            ctx.fillStyle=this.tc;
+            ctx.strokeStyle="white"; ctx.lineWidth=6;
+            ctx.translate(this.x+this.w/2,this.y+this.h/1.5);
+            ctx.scale(1.15,1);
+            ctx.strokeText(this.text,0,0);
+            ctx.fillText(this.text,0,0);
         }
         ctx.restore();
     }
-
-    isClicked(mouseX, mouseY) {
-        return mouseX >= this.x && mouseX <= this.x + this.width &&
-        mouseY >= this.y && mouseY <= this.y + this.height;
+    isClicked(mx,my){
+        return mx>=this.x&&mx<=this.x+this.w&&my>=this.y&&my<=this.y+this.h;
     }
 }
 
-    // **Piece Class**
 class Piece {
-    constructor(tileX, tileY, type, image) {
-        this.tileX = tileX;         // Current position in tile coordinates (0-7)
-        this.tileY = tileY;
-        this.type = type;           // "black" or "white"
-        this.image = image;
-        this.isKing = false;
-        this.selected = false;
-        this.isMoving = false;
-        this.moveProgress = 0;      // Animation progress (0 to 1)
-        this.startTileX = 0;
-        this.startTileY = 0;
-        this.targetTileX = 0;
-        this.targetTileY = 0;
+    constructor(row,col,type,img){
+        Object.assign(this,{row,col,type,img});
+        this.selected=false;
+        this.isMoving=false; this.moveProgress=0;
+        this.startRow=0; this.startCol=0;
+        this.targetRow=0; this.targetCol=0;
     }
-
-    draw() {
-        if (currentScene !== "game") return;
-            let pixelX, pixelY;
-        if (this.isMoving) {
-            const startX = BOARD_X + this.startTileX * TILE_SIZE;
-            const startY = BOARD_Y + this.startTileY * TILE_SIZE;
-            const endX = BOARD_X + this.targetTileX * TILE_SIZE;
-            const endY = BOARD_Y + this.targetTileY * TILE_SIZE;
-            pixelX = startX + (endX - startX) * this.moveProgress;
-            pixelY = startY + (endY - startY) * this.moveProgress;
+    draw(){
+        if(currentScene!=="game") return;
+        let x,y;
+        if(this.isMoving){
+            let sx=BOARD_X+this.startCol*TILE,
+                sy=BOARD_Y+this.startRow*TILE,
+                ex=BOARD_X+this.targetCol*TILE,
+                ey=BOARD_Y+this.targetRow*TILE;
+            x=sx+(ex-sx)*this.moveProgress;
+            y=sy+(ey-sy)*this.moveProgress;
         } else {
-            pixelX = BOARD_X + this.tileX * TILE_SIZE;
-            pixelY = BOARD_Y + this.tileY * TILE_SIZE;
+            x=BOARD_X+this.col*TILE;
+            y=BOARD_Y+this.row*TILE;
         }
-
-        const padding = 5;
-        const drawWidth = TILE_SIZE - padding * 2;
-        const drawHeight = TILE_SIZE - padding * 2;
-        ctx.drawImage(this.image, pixelX + padding, pixelY + padding, drawWidth, drawHeight);
-
-        if (this.selected) {
-            ctx.strokeStyle = "yellow";
-            ctx.lineWidth = 4;
-            ctx.strokeRect(pixelX, pixelY, TILE_SIZE, TILE_SIZE);
+        let p=5;
+        ctx.drawImage(this.img,x+p,y+p,TILE-2*p,TILE-2*p);
+        if(this.selected){
+            ctx.strokeStyle="yellow"; ctx.lineWidth=4;
+            ctx.strokeRect(x,y,TILE,TILE);
         }
     }
-
-    startMove(targetTileX, targetTileY) {
-        this.startTileX = this.tileX;
-        this.startTileY = this.tileY;
-        this.targetTileX = targetTileX;
-        this.targetTileY = targetTileY;
-        this.isMoving = true;
-        this.moveProgress = 0;
+    startMove(toRow,toCol){
+        this.startRow=this.row; this.startCol=this.col;
+        this.targetRow=toRow; this.targetCol=toCol;
+        this.isMoving=true; this.moveProgress=0;
     }
-
-    update(deltaTime) {
-        if (!this.isMoving) return;
-        this.moveProgress += deltaTime / 500; // Movement takes 500ms
-        if (this.moveProgress >= 1) {
-            this.moveProgress = 1;
-            this.isMoving = false;
-            this.tileX = this.targetTileX;
-            this.tileY = this.targetTileY;
-            // TODO: Add kinging logic here later
+    update(dt){
+        if(!this.isMoving) return;
+        this.moveProgress += dt/500;
+        if(this.moveProgress>=1){
+            this.moveProgress=1;
+            this.isMoving=false;
+            this.row=this.targetRow;
+            this.col=this.targetCol;
         }
     }
-
-    isClicked(mouseX, mouseY) {
-        const pixelX = BOARD_X + this.tileX * TILE_SIZE;
-        const pixelY = BOARD_Y + this.tileY * TILE_SIZE;
-        return mouseX >= pixelX && mouseX < pixelX + TILE_SIZE &&
-        mouseY >= pixelY && mouseY < pixelY + TILE_SIZE;
+    isClicked(mx,my){
+        let x=BOARD_X+this.col*TILE,
+            y=BOARD_Y+this.row*TILE;
+        return mx>=x&&mx<x+TILE&&my>=y&&my<y+TILE;
     }
-
-    select() {
-        pieces.forEach(p => p.selected = false);
-        this.selected = true;
+    select(){
+        pieces.forEach(p=>p.selected=false);
+        this.selected=true;
     }
 }
 
-    // **Game State**
-let currentScene = "menu";
-let pieces = [];
-const buttons = [
-    // Menu Buttons
-    new Button(canvas.width * 0.5 - 125, 20, 250, 250, "Flag", "menu", () => switchScene("game"), images.logo),
-    new Button(20, 20, 90, 90, "Settings", "menu", () => switchScene("settings"), images.settings),
-    new Button(canvas.width - 110, 20, 90, 90, "Profile", "menu", () => switchScene("profile"), images.profile),
-    new Button(canvas.width - 110, canvas.height - 110, 90, 90, "QA", "menu", () => switchScene("qa"), images.qa),
-    new Button(canvas.width / 2 - 150, canvas.height / 2, 300, 70, "Play", "menu", () => switchScene("game"), images.play_btn, 40, "#A6BFDB", "#6A8CBB"),
-    new Button(canvas.width / 2 - 150, canvas.height / 2 + 92, 300, 70, "New Game", "menu", () => { switchScene("game"); resetBoard(); }, images.new_game_btn, 40, "#A6BFDB", "#6A8CBB"),
-    new Button(canvas.width / 2 - 150, canvas.height / 2 + 184, 300, 70, "Your Score", "menu", () => switchScene("game"), images.your_score_btn, 40, "#A6BFDB", "#6A8CBB"),
+// game state
+let currentScene="menu";
+let boardLogic=new Board();
+let aiLogic=new AI(boardLogic);
+let plLogic=new PlayerLogic(boardLogic);
+let pieces=[];
+let selectedPiece=null;
 
-    // Game Buttons
-    new Button(canvas.width - 170, 20, 150, 150, "Flag", "game", () => switchScene("menu"), images.logo),
-    new Button(canvas.width / 2 + 150, 270, 350, 100, "Difficulty", "game", null, images.difficulty),
-    new Button(10, canvas.height - 100, 300, 70, "Menu", "game", () => switchScene("menu"), images.menu_button, 40, "#A6BFDB", "#6A8CBB"),
-    new Button(340, canvas.height - 100, 300, 70, "New Game", "game", () => { switchScene("game"); resetBoard(); }, images.new_game_button, 40, "#A6BFDB", "#6A8CBB"),
-    new Button(canvas.width - 110, canvas.height - 110, 90, 90, "QA", "game", () => switchScene("qa"), images.qa)
+// animation queue
+let animQueue=[], animating=false, currentAnim=null, waitingForCompletion=false;
+
+function enqueueAnimation(chain, value){
+    // chain = [[r,c],...]
+    animQueue=[];
+    for(let i=0;i<chain.length-1;i++){
+        let [r1,c1]=chain[i], [r2,c2]=chain[i+1];
+        let cap = Math.abs(r2-r1)===2 ? [(r1+r2)/2|0,(c1+c2)/2|0] : null;
+        animQueue.push({from:[r1,c1],to:[r2,c2],capture:cap,value});
+    }
+    animating=true;
+    runNextAnim();
+}
+
+function runNextAnim(){
+    if(animQueue.length===0){
+        currentAnim=null; animating=false;
+        // if it was player, trigger AI
+        if(currentAnimValue===1){
+            let chain=aiLogic.getMoveChain();
+            if(chain) enqueueAnimation(chain,2);
+        }
+        return;
+    }
+    currentAnim=animQueue.shift();
+    currentAnimValue=currentAnim.value;
+    let [r,c]=currentAnim.from;
+    let p=pieces.find(x=>x.row===r&&x.col===c);
+    if(!p) { runNextAnim(); return; }
+    p.startMove(...currentAnim.to);
+    waitingForCompletion=true;
+}
+
+function completeCurrentAnim(){
+    let {from,to,capture,value}=currentAnim;
+    // update logic
+    boardLogic.set(...from,0);
+    boardLogic.set(...to,value);
+    if(capture) boardLogic.set(...capture,0);
+    // update UI pieces
+    if(capture){
+        pieces = pieces.filter(x=>!(x.row===capture[0]&&x.col===capture[1]));
+    }
+    // the moving piece already updated its row/col in update()
+    waitingForCompletion=false;
+    runNextAnim();
+}
+
+function syncPieces(){
+    // only called on new game or scene changes
+    pieces=[];
+    for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+        let v=boardLogic.get(r,c);
+        if(v===1) pieces.push(new Piece(r,c,"white",images.whitePiece));
+        if(v===2) pieces.push(new Piece(r,c,"black",images.blackPiece));
+    }
+}
+
+// buttons (as before) …
+const buttons=[
+    new Button(canvas.width/2-125,20,250,250,"Flag","menu",()=>switchScene("game"),images.logo),
+    new Button(20,20,90,90,"Settings","menu",()=>switchScene("settings"),images.settings),
+    new Button(canvas.width-110,20,90,90,"Profile","menu",()=>switchScene("profile"),images.profile),
+    new Button(canvas.width-110,canvas.height-110,90,90,"QA","menu",()=>switchScene("qa"),images.qa),
+    new Button(canvas.width/2-150,canvas.height/2,300,70,"Play","menu",()=>{
+        switchScene("game"); boardLogic=new Board(); aiLogic=new AI(boardLogic); plLogic=new PlayerLogic(boardLogic); syncPieces();
+    },images.play_btn,40,"#A6BFDB","#6A8CBB"),
+    new Button(canvas.width/2-150,canvas.height/2+92,300,70,"New Game","menu",()=>{
+        boardLogic=new Board(); aiLogic=new AI(boardLogic); plLogic=new PlayerLogic(boardLogic); syncPieces(); switchScene("game");
+    },images.new_game_btn,40,"#A6BFDB","#6A8CBB"),
+    new Button(canvas.width/2-150,canvas.height/2+184,300,70,"Your Score","menu",()=>switchScene("game"),images.your_score_btn,40,"#A6BFDB","#6A8CBB"),
+
+    new Button(canvas.width-170,20,150,150,"Flag","game",()=>switchScene("menu"),images.logo),
+    new Button(canvas.width/2+150,270,350,100,"Difficulty","game",null,images.difficulty),
+    new Button(10,canvas.height-100,300,70,"Menu","game",()=>switchScene("menu"),images.menu_button,40,"#A6BFDB","#6A8CBB"),
+    new Button(340,canvas.height-100,300,70,"New Game","game",()=>{
+        boardLogic=new Board(); aiLogic=new AI(boardLogic); plLogic=new PlayerLogic(boardLogic); syncPieces();
+    },images.new_game_button,40,"#A6BFDB","#6A8CBB"),
+    new Button(canvas.width-110,canvas.height-110,90,90,"QA","game",()=>switchScene("qa"),images.qa)
 ];
 
-// **Initialization Functions**
-function resetBoard() {
-    pieces = [
-        // Black pieces (top)
-        new Piece(1, 0, "black", images.blackPiece),
-        new Piece(3, 0, "black", images.blackPiece),
-        new Piece(5, 0, "black", images.blackPiece),
-        new Piece(7, 0, "black", images.blackPiece),
-        new Piece(0, 1, "black", images.blackPiece),
-        new Piece(2, 1, "black", images.blackPiece),
-        new Piece(4, 1, "black", images.blackPiece),
-        new Piece(6, 1, "black", images.blackPiece),
-        new Piece(1, 2, "black", images.blackPiece),
-        new Piece(3, 2, "black", images.blackPiece),
-        new Piece(5, 2, "black", images.blackPiece),
-        new Piece(7, 2, "black", images.blackPiece),
-        // White pieces (bottom)
-        new Piece(0, 7, "white", images.whitePiece),
-        new Piece(2, 7, "white", images.whitePiece),
-        new Piece(4, 7, "white", images.whitePiece),
-        new Piece(6, 7, "white", images.whitePiece),
-        new Piece(1, 6, "white", images.whitePiece),
-        new Piece(3, 6, "white", images.whitePiece),
-        new Piece(5, 6, "white", images.whitePiece),
-        new Piece(7, 6, "white", images.whitePiece),
-        new Piece(0, 5, "white", images.whitePiece),
-        new Piece(2, 5, "white", images.whitePiece),
-        new Piece(4, 5, "white", images.whitePiece),
-        new Piece(6, 5, "white", images.whitePiece)
-    ];
+function switchScene(s){
+    currentScene=s;
 }
 
-    // **Scene Management**
-function switchScene(scene) {
-    currentScene = scene;
-}
-
-    // **Rendering Functions**
-function drawBoard() {
-    ctx.drawImage(images.board, BOARD_X, BOARD_Y, 580, 580);
-}
-
-function drawPieces() {
-    pieces.forEach(piece => piece.draw());
-}
-
-function drawProgressBar() {
-    const x = canvas.width / 2 + 320;
-    const y = 460;
-    const width = 350;
-    const height = 80;
-    const borderRadius = height / 2;
-    const progress = 0.49; // Static 69% for now
-
+// draw helpers
+function drawBoard(){ ctx.drawImage(images.board,BOARD_X,BOARD_Y,BOARD_PIX,BOARD_PIX); }
+function drawProgress(){
+    const x=canvas.width/2+320,y=460,w=350,h=80,br=h/2,pad=6,p=0.49;
     ctx.save();
-    ctx.fillStyle = "white";
-    ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-    ctx.shadowBlur = 15;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 5;
-    ctx.beginPath();
-    ctx.roundRect(x - width / 2, y, width, height, borderRadius);
-    ctx.fill();
+    ctx.fillStyle="white"; ctx.shadowColor="rgba(0,0,0,0.3)"; ctx.shadowBlur=15; ctx.shadowOffsetY=5;
+    ctx.beginPath(); ctx.roundRect(x-w/2,y,w,h,br); ctx.fill();
     ctx.restore();
-
-    const padding = 6;
-    const innerWidth = (width - padding * 2) * progress;
-    const innerHeight = height - padding * 2;
-    ctx.fillStyle = "#C8D093";
-    ctx.beginPath();
-    ctx.roundRect(x - width / 2 + padding, y + padding, innerWidth, innerHeight, innerHeight / 2);
-    ctx.fill();
-
-    ctx.fillStyle = "black";
-    ctx.font = "30px Comic Sans MS";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(Math.round(progress * 100) + "%", x, y + height / 2);
+    ctx.fillStyle="#C8D093";
+    ctx.beginPath(); ctx.roundRect(x-w/2+pad,y+pad,(w-pad*2)*p,h-pad*2,(h-pad*2)/2); ctx.fill();
+    ctx.fillStyle="black"; ctx.font="30px Comic Sans MS"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(Math.round(p*100)+"%",x,y+h/2);
 }
 
-function renderScene() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    buttons.forEach(button => button.draw());
-
-    if (currentScene === "menu") {
-        ctx.drawImage(images.naming, canvas.width / 2 - 350, 270, 700, 100);
-    } else if (currentScene === "game") {
+// main loop
+let last=0;
+function gameLoop(ts){
+    const dt=ts-last; last=ts;
+    // update animations
+    pieces.forEach(p=>p.update(dt));
+    if(waitingForCompletion && currentAnim){
+        // find the moving piece
+        let mp=pieces.find(p=>p.row===currentAnim.to[0]&&p.col===currentAnim.to[1]&& !p.isMoving);
+        if(mp) completeCurrentAnim();
+    }
+    // draw
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    buttons.forEach(b=>b.draw());
+    if(currentScene==="menu"){
+        ctx.drawImage(images.naming,canvas.width/2-350,270,700,100);
+    } else if(currentScene==="game"){
         drawBoard();
-        drawPieces();
-        ctx.drawImage(images.naming, canvas.width / 2 + 100, 70, 220, 40);
-        ctx.drawImage(images.your_turn, canvas.width / 2 + 220, 400, 200, 50);
-        drawProgressBar();
-        ctx.drawImage(images.dificulty_avatar, canvas.width / 2 + 150, 220, 90, 150);
+        pieces.forEach(p=>p.draw());
+        ctx.drawImage(images.naming,canvas.width/2+100,70,220,40);
+        ctx.drawImage(images.your_turn,canvas.width/2+220,400,200,50);
+        ctx.drawImage(images.dificulty_avatar,canvas.width/2+150,220,90,150);
+        drawProgress();
     }
-}
-
-    // **Game Loop**
-let lastTime = 0;
-function gameLoop(timestamp) {
-    const deltaTime = timestamp - lastTime;
-    lastTime = timestamp;
-
-    if (currentScene === "game") {
-        pieces.forEach(piece => piece.update(deltaTime));
-    }
-
-    renderScene();
     requestAnimationFrame(gameLoop);
 }
 
-// **Event Handlers**
-canvas.addEventListener("click", (event) => {
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-
-    // Handle button clicks
-    buttons.forEach(button => {
-        if (button.scene === currentScene && button.isClicked(mouseX, mouseY) && button.onClick) {
-            button.onClick();
+// input
+canvas.addEventListener("click",e=>{
+    if(animating) return; // ignore while animating
+    let rct=canvas.getBoundingClientRect();
+    let mx=e.clientX-rct.left, my=e.clientY-rct.top;
+    // buttons
+    for(let b of buttons){
+        if(b.scene===currentScene && b.isClicked(mx,my) && b.onClick){
+            b.onClick();
+            return;
         }
-    });
-
-    if (currentScene === "game") {
-        let pieceClicked = false;
-        // Handle piece selection
-        pieces.forEach(piece => {
-            if (piece.isClicked(mouseX, mouseY)) {
-                piece.select();
-                pieceClicked = true;
+    }
+    if(currentScene==="game"){
+        // select
+        let hit=pieces.find(p=>p.isClicked(mx,my)&&p.type==="white");
+        if(hit){
+            pieces.forEach(p=>p.selected=false);
+            hit.selected=true;
+            selectedPiece=hit;
+            return;
+        }
+        // move
+        if(selectedPiece){
+            let tr=Math.floor((my-BOARD_Y)/TILE),
+                tc=Math.floor((mx-BOARD_X)/TILE);
+            let chain=plLogic.getMoveChain([selectedPiece.row,selectedPiece.col],[tr,tc]);
+            if(chain){
+                enqueueAnimation(chain,1);
             }
-        });
-
-        // Handle piece movement
-        if (!pieceClicked) {
-            const selectedPiece = pieces.find(p => p.selected);
-            if (selectedPiece) {
-                const tileX = Math.floor((mouseX - BOARD_X) / TILE_SIZE);
-                const tileY = Math.floor((mouseY - BOARD_Y) / TILE_SIZE);
-                if (isValidMove(selectedPiece, tileX, tileY)) {
-                    selectedPiece.startMove(tileX, tileY);
-                    selectedPiece.selected = false;
-                }
-            }
+            pieces.forEach(p=>p.selected=false);
+            selectedPiece=null;
         }
     }
 });
 
-canvas.addEventListener("mousemove", (event) => {
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-
-    let hovering = false;
-    buttons.forEach(button => {
-        if (button.scene === currentScene && button.isClicked(mouseX, mouseY)) {
-            hovering = true;
-        }
+// start
+Promise.all(Object.values(images).map(img=>new Promise(r=>img.onload=r)))
+    .then(()=>{
+        syncPieces();
+        requestAnimationFrame(gameLoop);
     });
-    if (currentScene === "game") {
-        pieces.forEach(piece => {
-            if (piece.isClicked(mouseX, mouseY)) {
-                hovering = true;
-            }
-        });
-    }
-    canvas.style.cursor = hovering ? "pointer" : "default";
-});
-
-// **Helper Functions**
-function isValidMove(piece, targetX, targetY) {
-    // Basic placeholder: diagonal move to an empty tile
-    if (targetX < 0 || targetX >= BOARD_SIZE || targetY < 0 || targetY >= BOARD_SIZE) return false;
-    if (pieces.some(p => p.tileX === targetX && p.tileY === targetY)) return false;
-    const dx = Math.abs(targetX - piece.tileX);
-    const dy = targetY - piece.tileY;
-    if (dx !== 1 || Math.abs(dy) !== 1) return false;
-    if (piece.type === "black" && dy <= 0) return false; // Black moves down
-    if (piece.type === "white" && dy >= 0) return false; // White moves up
-    return true;
-}
-
-// **Initialization**
-const imageLoadPromises = Object.values(images).map(img =>
-    new Promise(resolve => img.onload = resolve)
-);
-
-Promise.all(imageLoadPromises).then(() => {
-    resetBoard();
-    switchScene("menu");
-    requestAnimationFrame(gameLoop);
-});
