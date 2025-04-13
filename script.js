@@ -17,6 +17,16 @@ class Board {
             [1,0,1,0,1,0,1,0],
             [0,1,0,1,0,1,0,1],
             [1,0,1,0,1,0,1,0]
+            // [0,0,0,0,0,0,0,0],
+            // [1,0,1,0,1,0,1,0],
+            // [0,0,0,0,0,0,0,0],
+            // [0,0,0,0,0,0,0,0],
+            // [0,0,0,0,0,0,0,0],
+            // [0,0,0,0,0,0,0,0],
+            // [0,2,0,2,0,2,0,2],
+            // [0,0,0,0,0,0,0,0],
+
+
         ];
     }
     get(r, c) {
@@ -211,51 +221,53 @@ class PlayerLogic {
     // Returns a valid move chain based on the attempted start and end locations.
     getMoveChain(start, end) {
         // 1) Try to find a capture chain first
-        let chains = this.findMultiAttacks(...start);
-        // Find a chain starting with the intended target
-        let chain = chains.find(ch => ch[1][0] === end[0] && ch[1][1] === end[1]);
+        const chains = this.findMultiAttacks(...start);
+        const chain = chains.find(ch => ch[1][0] === end[0] && ch[1][1] === end[1]);
         if (chain) return chain;
 
-        // 2) If no capture is forced, allow a simple move.
-        // Only allow simple moves if no mandatory capture exists.
+        // 2) No capture? Try simple move
         if (!this.hasMandatory()) {
             const [r1, c1] = start;
             const [r2, c2] = end;
             const piece = this.board.get(r1, c1);
-            // Check that the destination square is empty
-            if (this.board.get(r2, c2) === 0) {
-                // For a regular man (piece value 1) allow only one step upward.
-                if (piece === 1) {
-                    if (r2 === r1 - 1 && Math.abs(c2 - c1) === 1) {
-                        return [[r1, c1], [r2, c2]];
+            const target = this.board.get(r2, c2);
+
+            if (target !== 0) return null; // destination not empty=
+
+
+            if (piece === 1) {
+                // Regular piece: only one forward diagonal step
+                if (r2 === r1 - 1 && Math.abs(c2 - c1) === 1) {
+                    return [[r1, c1], [r2, c2]];
+                }
+            } else if (piece === 3) {
+                // King: allow long-range diagonal move
+                const dr = r2 - r1;
+                const dc = c2 - c1;
+
+                // Must be a diagonal move
+                if (Math.abs(dr) !== Math.abs(dc)) return null;
+
+                const stepR = dr > 0 ? 1 : -1;
+                const stepC = dc > 0 ? 1 : -1;
+
+                for (let i = 1; i < Math.abs(dr); i++) {
+                    const rr = r1 + i * stepR;
+                    const cc = c1 + i * stepC;
+                    if (this.board.get(rr, cc) !== 0) {
+                        return null; // path blocked
                     }
                 }
-                // For a king (piece value 3) allow any diagonal move if the path is clear.
-                else if (piece === 3) {
-                    const dr = r2 - r1;
-                    const dc = c2 - c1;
-                    // Must be a diagonal move (and not zero-length)
-                    if (Math.abs(dr) === Math.abs(dc) && Math.abs(dr) > 0) {
-                        // Determine the direction of travel
-                        const stepR = dr > 0 ? 1 : -1;
-                        const stepC = dc > 0 ? 1 : -1;
-                        let valid = true;
-                        // Check every square in between (excluding start and destination)
-                        for (let i = 1; i < Math.abs(dr); i++) {
-                            const rr = r1 + i * stepR;
-                            const cc = c1 + i * stepC;
-                            if (this.board.get(rr, cc) !== 0) {
-                                valid = false;
-                                break;
-                            }
-                        }
-                        if (valid) return [[r1, c1], [r2, c2]];
-                    }
-                }
+
+                // Legal diagonal slide
+                return [[r1, c1], [r2, c2]];
             }
         }
+
         return null;
     }
+
+
 }
 
 
@@ -396,15 +408,38 @@ let animQueue=[], animating=false, currentAnim=null, waitingForCompletion=false;
 
 function enqueueAnimation(chain, value){
     // chain = [[r,c],...]
-    animQueue=[];
-    for(let i=0;i<chain.length-1;i++){
-        let [r1,c1]=chain[i], [r2,c2]=chain[i+1];
-        let cap = Math.abs(r2-r1)===2 ? [(r1+r2)/2|0,(c1+c2)/2|0] : null;
-        animQueue.push({from:[r1,c1],to:[r2,c2],capture:cap,value});
+    animQueue = [];
+    for(let i = 0; i < chain.length - 1; i++){
+        let [r1, c1] = chain[i],
+            [r2, c2] = chain[i + 1];
+        let cap = null;
+        let dr = r2 - r1;
+        let dc = c2 - c1;
+
+        if(Math.abs(dr) === 2){
+            // Normal piece capture or king capture with minimal jump.
+            cap = [ (r1 + r2) >> 1, (c1 + c2) >> 1 ];
+        } else if(Math.abs(dr) > 2){
+            // King capturing over a longer distance.
+            let stepR = dr > 0 ? 1 : -1;
+            let stepC = dc > 0 ? 1 : -1;
+            // Scan intermediate squares between the source and destination.
+            for(let j = 1; j < Math.abs(dr); j++){
+                let midR = r1 + j * stepR,
+                    midC = c1 + j * stepC;
+                // When you find the first non-empty square, assume it's the enemy piece.
+                if(boardLogic.get(midR, midC) !== 0){
+                    cap = [ midR, midC ];
+                    break;
+                }
+            }
+        }
+        animQueue.push({from: [r1, c1], to: [r2, c2], capture: cap, value});
     }
-    animating=true;
+    animating = true;
     runNextAnim();
 }
+
 
 function runNextAnim(){
     if(animQueue.length===0){
@@ -429,8 +464,10 @@ function completeCurrentAnim(){
     let { from, to, capture, value } = currentAnim;
 
     // 1) remove from‐square
+    let myVal = boardLogic.get(...from);
     boardLogic.set(...from, 0);
 
+    value = myVal; // КОСТЫЫЫЫЫЫЛЬ
     // 2) decide if we crown
     let newVal = value;
     // black man (2) reaching row 7 → black king (4)
