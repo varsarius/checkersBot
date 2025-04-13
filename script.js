@@ -1,11 +1,12 @@
 // checkers.js
-
 // ----------------------
-//  LOGIC LAYER (Strategy)
+//  LOGIC LAYER (Model / Strategy)
 // ----------------------
 
 class Board {
-    constructor() { this.board = this.createBoard(); }
+    constructor() {
+        this.board = this.createBoard();
+    }
     createBoard() {
         return [
             [0,2,0,2,0,2,0,2],
@@ -18,206 +19,65 @@ class Board {
             [1,0,1,0,1,0,1,0]
         ];
     }
-    get(r,c){return this.board[r][c];}
-    set(r,c,v){this.board[r][c]=v;}
+    get(r, c) {
+        return this.board[r][c];
+    }
+    set(r, c, value) {
+        this.board[r][c] = value;
+    }
 }
 
 class AI {
-    constructor(board){ this.board = board; }
-    // find all capture chains from (r,c)
+    constructor(board) {
+        this.board = board;
+    }
+    // Return all capture chains for the given piece
     findMultiAttacks(r, c, visited = new Set()) {
         const me    = this.board.get(r, c);
-        const isKing= me === 4;
+        const isKing = me === 4;
         const enemy = (x) => x === 1 || x === 3;
         const dirs  = [[-1,-1],[-1,1],[1,-1],[1,1]];
         let out = [];
 
         for (let [dr, dc] of dirs) {
-            // for men: single‐step check as before
             if (!isKing) {
-                const mr = r+dr, mc = c+dc, er = r+2*dr, ec = c+2*dc;
-                if (er<0||er>7||ec<0||ec>7) continue;
-                if (enemy(this.board.get(mr,mc)) && this.board.get(er,ec)===0) {
-                    const key = `${mr},${mc}`;      // track captured square
+                const mr = r + dr, mc = c + dc, er = r + 2 * dr, ec = c + 2 * dc;
+                if (er < 0 || er > 7 || ec < 0 || ec > 7) continue;
+                if (enemy(this.board.get(mr, mc)) && this.board.get(er, ec) === 0) {
+                    const key = `${mr},${mc}`;
                     if (visited.has(key)) continue;
-                    let nv = new Set(visited); nv.add(key);
-                    let fut= this.findMultiAttacks(er,ec,nv);
+                    let nv = new Set(visited);
+                    nv.add(key);
+                    let fut = this.findMultiAttacks(er, ec, nv);
                     if (fut.length) {
-                        for (let p of fut) out.push([[r,c],[er,ec], ...p.slice(1)]);
+                        for (let p of fut) out.push([[r, c], [er, ec], ...p.slice(1)]);
                     } else {
-                        out.push([[r,c],[er,ec]]);
-                    }
-                }
-            }
-            // for kings: scan outwards to find enemy, then land any empty beyond
-            else {
-                let i = 1;
-                // skip empty squares until we see a piece or edge
-                while (true) {
-                    const mr = r + i*dr, mc = c + i*dc;
-                    if (mr<0||mr>7||mc<0||mc>7) break;
-                    const midVal = this.board.get(mr,mc);
-                    if (midVal === 0) { i++; continue; }
-                    // found non‐empty: must be enemy to capture
-                    if (!enemy(midVal)) break;
-                    // now scan landing squares beyond it
-                    let j = 1;
-                    while (true) {
-                        const er = mr + j*dr, ec = mc + j*dc;
-                        if (er<0||er>7||ec<0||ec>7) break;
-                        if (this.board.get(er,ec) !== 0) break;
-                        const key = `${mr},${mc}`;  // captured square
-                        if (!visited.has(key)) {
-                            let nv = new Set(visited); nv.add(key);
-                            let fut= this.findMultiAttacks(er,ec,nv);
-                            if (fut.length) {
-                                for (let p of fut) out.push([[r,c],[er,ec], ...p.slice(1)]);
-                            } else {
-                                out.push([[r,c],[er,ec]]);
-                            }
-                        }
-                        j++;
-                    }
-                    break;  // whether we captured or not, we stop scanning this dir
-                }
-            }
-        }
-
-        return out;
-    }
-    getBestChain(){
-        let all=[];
-        for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-            if(this.board.get(r,c)===2){
-                let chains=this.findMultiAttacks(r,c);
-                if(chains.length) all.push(...chains);
-            }
-        }
-        if(!all.length) return null;
-        return all.reduce((a,b)=>b.length>a.length?b:a);
-    }
-    getAdvanceMove(){
-        for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-            if(this.board.get(r,c)!==2) continue;
-            for(let [dr,dc] of [[1,-1],[1,1]]){
-                let nr=r+dr,nc=c+dc;
-                if(nr<0||nr>7||nc<0||nc>7) continue;
-                if(this.board.get(nr,nc)===0) return [[r,c],[nr,nc]];
-            }
-        }
-        return null;
-    }
-    getRandomMove() {
-        const capChains   = [];
-        const normalMoves = [];
-
-        // directions
-        const allDirs     = [[-1,-1],[-1,1],[1,-1],[1,1]];
-        const forwardDirs = [[1,-1],[1,1]];
-
-        // helper to detect king
-        const isKing = v => v === 4;
-
-        // 1) Gather all capture‐chains (multi‐jumps) for men(2) & kings(4)
-        for (let r = 0; r < 8; r++) {
-            for (let c = 0; c < 8; c++) {
-                const v = this.board.get(r, c);
-                if (v !== 2 && v !== 4) continue;
-                // findMultiAttacks already handles kings (see next section)
-                const chains = this.findMultiAttacks(r, c);
-                if (chains.length) capChains.push(...chains);
-            }
-        }
-        if (capChains.length) {
-            return capChains[Math.floor(Math.random() * capChains.length)];
-        }
-
-        // 2) No captures: gather simple slides
-        for (let r = 0; r < 8; r++) {
-            for (let c = 0; c < 8; c++) {
-                const v = this.board.get(r, c);
-                if (v !== 2 && v !== 4) continue;
-                // choose dirs based on man vs king
-                const dirs = isKing(v) ? allDirs : forwardDirs;
-                for (let [dr, dc] of dirs) {
-                    let nr = r + dr, nc = c + dc;
-                    // for men: only one step
-                    if (!isKing(v)) {
-                        if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && this.board.get(nr,nc) === 0) {
-                            normalMoves.push([[r,c],[nr,nc]]);
-                        }
-                    }
-                    // for king: slide until blocked
-                    else {
-                        while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && this.board.get(nr,nc) === 0) {
-                            normalMoves.push([[r,c],[nr,nc]]);
-                            nr += dr; nc += dc;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (normalMoves.length) {
-            return normalMoves[Math.floor(Math.random() * normalMoves.length)];
-        }
-        return null;
-    }
-    getMoveChain(){
-        return this.getRandomMove();
-
-        let c=this.getBestChain(); if(c) return c;
-        let a=this.getAdvanceMove(); if(a) return a;
-    }
-}
-
-class PlayerLogic {
-    constructor(board){ this.board=board; }
-    findMultiAttacks(r, c, visited = new Set()) {
-        const me     = this.board.get(r, c);
-        const isKing = me === 3;
-        const enemy  = x => x === 2 || x === 4;
-        const dirs   = [[-1,-1],[-1,1],[1,-1],[1,1]];
-        let out = [];
-
-        for (let [dr, dc] of dirs) {
-            if (!isKing) {
-                // same single‐jump logic as before
-                const mr=r+dr, mc=c+dc, er=r+2*dr, ec=c+2*dc;
-                if (er<0||er>7||ec<0||ec>7) continue;
-                if (enemy(this.board.get(mr,mc)) && this.board.get(er,ec)===0) {
-                    const key=`${mr},${mc}`;
-                    if (visited.has(key)) continue;
-                    let nv=new Set(visited); nv.add(key);
-                    let fut=this.findMultiAttacks(er,ec,nv);
-                    if (fut.length) {
-                        for (let p of fut) out.push([[r,c],[er,ec],...p.slice(1)]);
-                    } else {
-                        out.push([[r,c],[er,ec]]);
+                        out.push([[r, c], [er, ec]]);
                     }
                 }
             } else {
-                // king: long‐range capture
-                let i=1;
+                let i = 1;
                 while (true) {
-                    const mr=r+i*dr, mc=c+i*dc;
-                    if (mr<0||mr>7||mc<0||mc>7) break;
-                    const midVal=this.board.get(mr,mc);
-                    if (midVal===0) { i++; continue; }
-                    if (!enemy(midVal)) break;
-                    let j=1;
+                    const mr = r + i * dr, mc = c + i * dc;
+                    if (mr < 0 || mr > 7 || mc < 0 || mc > 7) break;
+                    if (this.board.get(mr, mc) === 0) { i++; continue; }
+                    if (!enemy(this.board.get(mr, mc))) break;
+                    let j = 1;
                     while (true) {
-                        const er=mr+j*dr, ec=mc+j*dc;
-                        if (er<0||er>7||ec<0||ec>7) break;
-                        if (this.board.get(er,ec)!==0) break;
-                        const key=`${mr},${mc}`;
+                        const er = mr + j * dr, ec = mc + j * dc;
+                        if (er < 0 || er > 7 || ec < 0 || ec > 7) break;
+                        if (this.board.get(er, ec) !== 0) break;
+                        const key = `${mr},${mc}`;
                         if (!visited.has(key)) {
-                            let nv=new Set(visited); nv.add(key);
-                            let fut=this.findMultiAttacks(er,ec,nv);
+                            let nv = new Set(visited);
+                            nv.add(key);
+                            let fut = this.findMultiAttacks(er, ec, nv);
                             if (fut.length) {
-                                for (let p of fut) out.push([[r,c],[er,ec],...p.slice(1)]);
+                                for (let p of fut) {
+                                    out.push([[r, c], [er, ec], ...p.slice(1)]);
+                                }
                             } else {
-                                out.push([[r,c],[er,ec]]);
+                                out.push([[r, c], [er, ec]]);
                             }
                         }
                         j++;
@@ -226,36 +86,171 @@ class PlayerLogic {
                 }
             }
         }
-
         return out;
     }
+    // This function may later be modified to return all available chains for user choice
+    getMoveChain() {
+        const capChains = [];
+        // loop through all pieces for the AI side (value 2 or 4)
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                if (this.board.get(r, c) !== 2 && this.board.get(r, c) !== 4) continue;
+                const chains = this.findMultiAttacks(r, c);
+                if (chains.length) capChains.push(...chains);
+            }
+        }
+        if (capChains.length) {
+            // For AI we choose one chain randomly; this could be improved without affecting the UI
+            return capChains[Math.floor(Math.random() * capChains.length)];
+        }
+        // If no capture, return a random slide move (this logic can be refined as needed)
+        return this.getRandomMove();
+    }
+    getRandomMove() {
+        let normalMoves = [];
+        const allDirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+        const forwardDirs = [[1,-1],[1,1]];
+        const isKing = (v) => v === 4;
 
-    hasMandatory(){
-        for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-            const v = this.board.get(r,c);
-            // only white men (1) or white kings (3)
-            if (v !== 1 && v !== 3) continue;
-            if(this.findMultiAttacks(r,c).length) return true;
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const v = this.board.get(r, c);
+                if (v !== 2 && v !== 4) continue;
+                const dirs = isKing(v) ? allDirs : forwardDirs;
+                for (let [dr, dc] of dirs) {
+                    let nr = r + dr, nc = c + dc;
+                    if (!isKing(v)) {
+                        if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && this.board.get(nr, nc) === 0) {
+                            normalMoves.push([[r, c], [nr, nc]]);
+                        }
+                    } else {
+                        while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && this.board.get(nr, nc) === 0) {
+                            normalMoves.push([[r, c], [nr, nc]]);
+                            nr += dr;
+                            nc += dc;
+                        }
+                    }
+                }
+            }
+        }
+        if (normalMoves.length) return normalMoves[Math.floor(Math.random() * normalMoves.length)];
+        return null;
+    }
+}
+
+class PlayerLogic {
+    constructor(board) {
+        this.board = board;
+    }
+    findMultiAttacks(r, c, visited = new Set()) {
+        const me     = this.board.get(r, c);
+        const isKing = me === 3;
+        const enemy  = x => x === 2 || x === 4;
+        const dirs   = [[-1,-1],[-1,1],[1,-1],[1,1]];
+        let out = [];
+        for (let [dr, dc] of dirs) {
+            if (!isKing) {
+                const mr = r + dr, mc = c + dc, er = r + 2 * dr, ec = c + 2 * dc;
+                if (er < 0 || er > 7 || ec < 0 || ec > 7) continue;
+                if (enemy(this.board.get(mr, mc)) && this.board.get(er, ec) === 0) {
+                    const key = `${mr},${mc}`;
+                    if (visited.has(key)) continue;
+                    let nv = new Set(visited);
+                    nv.add(key);
+                    let fut = this.findMultiAttacks(er, ec, nv);
+                    if (fut.length) {
+                        for (let p of fut) out.push([[r, c], [er, ec], ...p.slice(1)]);
+                    } else {
+                        out.push([[r, c], [er, ec]]);
+                    }
+                }
+            } else {
+                let i = 1;
+                while (true) {
+                    const mr = r + i * dr, mc = c + i * dc;
+                    if (mr < 0 || mr > 7 || mc < 0 || mc > 7) break;
+                    if (this.board.get(mr, mc) === 0) { i++; continue; }
+                    if (!enemy(this.board.get(mr, mc))) break;
+                    let j = 1;
+                    while (true) {
+                        const er = mr + j * dr, ec = mc + j * dc;
+                        if (er < 0 || er > 7 || ec < 0 || ec > 7) break;
+                        if (this.board.get(er, ec) !== 0) break;
+                        const key = `${mr},${mc}`;
+                        if (!visited.has(key)) {
+                            let nv = new Set(visited);
+                            nv.add(key);
+                            let fut = this.findMultiAttacks(er, ec, nv);
+                            if (fut.length) {
+                                for (let p of fut) out.push([[r, c], [er, ec], ...p.slice(1)]);
+                            } else {
+                                out.push([[r, c], [er, ec]]);
+                            }
+                        }
+                        j++;
+                    }
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+    // Check if any mandatory capture is present (to enforce rules)
+    hasMandatory() {
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const v = this.board.get(r, c);
+                if (v !== 1 && v !== 3) continue;
+                if (this.findMultiAttacks(r, c).length) return true;
+            }
         }
         return false;
     }
+    // Returns a valid move chain based on the attempted start and end locations.
+    // Later you can modify this to return multiple options for the UI to let the user choose.
+    // Returns a valid move chain based on the attempted start and end locations.
     getMoveChain(start, end) {
-        // 1) Try a capture chain first
+        // 1) Try to find a capture chain first
         let chains = this.findMultiAttacks(...start);
-        let c = chains.find(ch => ch[1][0] === end[0] && ch[1][1] === end[1]);
-        if (c) return c;
+        // Find a chain starting with the intended target
+        let chain = chains.find(ch => ch[1][0] === end[0] && ch[1][1] === end[1]);
+        if (chain) return chain;
 
-        // 2) If no mandatory capture, allow a simple step.
+        // 2) If no capture is forced, allow a simple move.
+        // Only allow simple moves if no mandatory capture exists.
         if (!this.hasMandatory()) {
             const [r1, c1] = start;
             const [r2, c2] = end;
             const piece = this.board.get(r1, c1);
-            // only allow move if landing square is empty and diagonal distance is 1
-            if (this.board.get(r2, c2) === 0 && Math.abs(c2 - c1) === 1) {
-                // men (1) only go up (r2 === r1-1), kings (3) go either way
-                if ((piece === 1 && r2 === r1 - 1) ||
-                    (piece === 3 && Math.abs(r2 - r1) === 1)) {
-                    return [[r1, c1], [r2, c2]];
+            // Check that the destination square is empty
+            if (this.board.get(r2, c2) === 0) {
+                // For a regular man (piece value 1) allow only one step upward.
+                if (piece === 1) {
+                    if (r2 === r1 - 1 && Math.abs(c2 - c1) === 1) {
+                        return [[r1, c1], [r2, c2]];
+                    }
+                }
+                // For a king (piece value 3) allow any diagonal move if the path is clear.
+                else if (piece === 3) {
+                    const dr = r2 - r1;
+                    const dc = c2 - c1;
+                    // Must be a diagonal move (and not zero-length)
+                    if (Math.abs(dr) === Math.abs(dc) && Math.abs(dr) > 0) {
+                        // Determine the direction of travel
+                        const stepR = dr > 0 ? 1 : -1;
+                        const stepC = dc > 0 ? 1 : -1;
+                        let valid = true;
+                        // Check every square in between (excluding start and destination)
+                        for (let i = 1; i < Math.abs(dr); i++) {
+                            const rr = r1 + i * stepR;
+                            const cc = c1 + i * stepC;
+                            if (this.board.get(rr, cc) !== 0) {
+                                valid = false;
+                                break;
+                            }
+                        }
+                        if (valid) return [[r1, c1], [r2, c2]];
+                    }
                 }
             }
         }
