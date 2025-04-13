@@ -298,7 +298,8 @@ const images={
     whitePieceKing:   loadImg("./img/whitePieceKing.png"),
     play_btn:         loadImg("./img/play_btn.png"),
     new_game_btn:     loadImg("./img/new_game_btn.png"),
-    your_score_btn:   loadImg("./img/your_score_btn.png")
+    your_score_btn:   loadImg("./img/your_score_btn.png"),
+    on_off_btn:       loadImg("./img/on_off_btn.png"),
 };
 function loadImg(src){ let i=new Image(); i.src=src; return i; }
 
@@ -505,7 +506,10 @@ const buttons=[
     new Button(340,canvas.height-100,300,70,"New Game","game",()=>{
         boardLogic=new Board(); aiLogic=new AI(boardLogic); plLogic=new PlayerLogic(boardLogic); syncPieces();
     },images.new_game_button,40,"#A6BFDB","#6A8CBB"),
-    new Button(canvas.width-110,canvas.height-110,90,90,"QA","game",()=>switchScene("qa"),images.qa)
+    new Button(canvas.width-110,canvas.height-110,90,90,"QA","game",()=>switchScene("qa"),images.qa),
+
+
+    new Button(canvas.width/2-20,canvas.height/2-40,270,100,"on_sound_setting","settings",()=>console.log("clicked on volume_setting"),images.on_off_btn),
 ];
 
 function switchScene(s){
@@ -549,6 +553,8 @@ function gameLoop(ts){
         ctx.drawImage(images.your_turn,canvas.width/2+220,400,200,50);
         ctx.drawImage(images.dificulty_avatar,canvas.width/2+150,220,90,150);
         drawProgress();
+    } else if (currentScene==="settings"){
+
     }
     requestAnimationFrame(gameLoop);
 }
