@@ -25,22 +25,64 @@ class Board {
 class AI {
     constructor(board){ this.board = board; }
     // find all capture chains from (r,c)
-    findMultiAttacks(r,c,visited=new Set()){
-        const dirs=[[ -1,-1],[-1,1],[1,-1],[1,1]];
-        let out=[];
-        for(let [dr,dc] of dirs){
-            let mr=r+dr, mc=c+dc, er=r+2*dr, ec=c+2*dc;
-            if(er<0||er>7||ec<0||ec>7) continue;
-            if(this.board.get(mr,mc)===1 && this.board.get(er,ec)===0){
-                const key=`${er},${ec}`;
-                if(visited.has(key)) continue;
-                let nv=new Set(visited); nv.add(key);
-                let fut=this.findMultiAttacks(er,ec,nv);
-                if(fut.length){
-                    for(let p of fut) out.push([[r,c],[er,ec],...p.slice(1)]);
-                } else out.push([[r,c],[er,ec]]);
+    findMultiAttacks(r, c, visited = new Set()) {
+        const me    = this.board.get(r, c);
+        const isKing= me === 4;
+        const enemy = (x) => x === 1 || x === 3;
+        const dirs  = [[-1,-1],[-1,1],[1,-1],[1,1]];
+        let out = [];
+
+        for (let [dr, dc] of dirs) {
+            // for men: single‐step check as before
+            if (!isKing) {
+                const mr = r+dr, mc = c+dc, er = r+2*dr, ec = c+2*dc;
+                if (er<0||er>7||ec<0||ec>7) continue;
+                if (enemy(this.board.get(mr,mc)) && this.board.get(er,ec)===0) {
+                    const key = `${mr},${mc}`;      // track captured square
+                    if (visited.has(key)) continue;
+                    let nv = new Set(visited); nv.add(key);
+                    let fut= this.findMultiAttacks(er,ec,nv);
+                    if (fut.length) {
+                        for (let p of fut) out.push([[r,c],[er,ec], ...p.slice(1)]);
+                    } else {
+                        out.push([[r,c],[er,ec]]);
+                    }
+                }
+            }
+            // for kings: scan outwards to find enemy, then land any empty beyond
+            else {
+                let i = 1;
+                // skip empty squares until we see a piece or edge
+                while (true) {
+                    const mr = r + i*dr, mc = c + i*dc;
+                    if (mr<0||mr>7||mc<0||mc>7) break;
+                    const midVal = this.board.get(mr,mc);
+                    if (midVal === 0) { i++; continue; }
+                    // found non‐empty: must be enemy to capture
+                    if (!enemy(midVal)) break;
+                    // now scan landing squares beyond it
+                    let j = 1;
+                    while (true) {
+                        const er = mr + j*dr, ec = mc + j*dc;
+                        if (er<0||er>7||ec<0||ec>7) break;
+                        if (this.board.get(er,ec) !== 0) break;
+                        const key = `${mr},${mc}`;  // captured square
+                        if (!visited.has(key)) {
+                            let nv = new Set(visited); nv.add(key);
+                            let fut= this.findMultiAttacks(er,ec,nv);
+                            if (fut.length) {
+                                for (let p of fut) out.push([[r,c],[er,ec], ...p.slice(1)]);
+                            } else {
+                                out.push([[r,c],[er,ec]]);
+                            }
+                        }
+                        j++;
+                    }
+                    break;  // whether we captured or not, we stop scanning this dir
+                }
             }
         }
+
         return out;
     }
     getBestChain(){
@@ -65,64 +107,156 @@ class AI {
         }
         return null;
     }
-    getRandomMove(){
-        let m=[];
-        for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-            if(this.board.get(r,c)!==2) continue;
-            for(let [dr,dc] of [[1,-1],[1,1]]){
-                let nr=r+dr,nc=c+dc;
-                if(nr<0||nr>7||nc<0||nc>7) continue;
-                if(this.board.get(nr,nc)===0) m.push([[r,c],[nr,nc]]);
+    getRandomMove() {
+        const capChains   = [];
+        const normalMoves = [];
+
+        // directions
+        const allDirs     = [[-1,-1],[-1,1],[1,-1],[1,1]];
+        const forwardDirs = [[1,-1],[1,1]];
+
+        // helper to detect king
+        const isKing = v => v === 4;
+
+        // 1) Gather all capture‐chains (multi‐jumps) for men(2) & kings(4)
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const v = this.board.get(r, c);
+                if (v !== 2 && v !== 4) continue;
+                // findMultiAttacks already handles kings (see next section)
+                const chains = this.findMultiAttacks(r, c);
+                if (chains.length) capChains.push(...chains);
             }
         }
-        if(!m.length) return null;
-        return m[Math.floor(Math.random()*m.length)];
+        if (capChains.length) {
+            return capChains[Math.floor(Math.random() * capChains.length)];
+        }
+
+        // 2) No captures: gather simple slides
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const v = this.board.get(r, c);
+                if (v !== 2 && v !== 4) continue;
+                // choose dirs based on man vs king
+                const dirs = isKing(v) ? allDirs : forwardDirs;
+                for (let [dr, dc] of dirs) {
+                    let nr = r + dr, nc = c + dc;
+                    // for men: only one step
+                    if (!isKing(v)) {
+                        if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && this.board.get(nr,nc) === 0) {
+                            normalMoves.push([[r,c],[nr,nc]]);
+                        }
+                    }
+                    // for king: slide until blocked
+                    else {
+                        while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && this.board.get(nr,nc) === 0) {
+                            normalMoves.push([[r,c],[nr,nc]]);
+                            nr += dr; nc += dc;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (normalMoves.length) {
+            return normalMoves[Math.floor(Math.random() * normalMoves.length)];
+        }
+        return null;
     }
     getMoveChain(){
+        return this.getRandomMove();
+
         let c=this.getBestChain(); if(c) return c;
         let a=this.getAdvanceMove(); if(a) return a;
-        return this.getRandomMove();
     }
 }
 
 class PlayerLogic {
     constructor(board){ this.board=board; }
-    findMultiAttacks(r,c,visited=new Set()){
-        const dirs=[[ -1,-1],[-1,1],[1,-1],[1,1]];
-        let out=[];
-        for(let [dr,dc] of dirs){
-            let mr=r+dr, mc=c+dc, er=r+2*dr, ec=c+2*dc;
-            if(er<0||er>7||ec<0||ec>7) continue;
-            if(this.board.get(mr,mc)===2 && this.board.get(er,ec)===0){
-                const key=`${er},${ec}`;
-                if(visited.has(key)) continue;
-                let nv=new Set(visited); nv.add(key);
-                let fut=this.findMultiAttacks(er,ec,nv);
-                if(fut.length){
-                    for(let p of fut) out.push([[r,c],[er,ec],...p.slice(1)]);
-                } else out.push([[r,c],[er,ec]]);
+    findMultiAttacks(r, c, visited = new Set()) {
+        const me     = this.board.get(r, c);
+        const isKing = me === 3;
+        const enemy  = x => x === 2 || x === 4;
+        const dirs   = [[-1,-1],[-1,1],[1,-1],[1,1]];
+        let out = [];
+
+        for (let [dr, dc] of dirs) {
+            if (!isKing) {
+                // same single‐jump logic as before
+                const mr=r+dr, mc=c+dc, er=r+2*dr, ec=c+2*dc;
+                if (er<0||er>7||ec<0||ec>7) continue;
+                if (enemy(this.board.get(mr,mc)) && this.board.get(er,ec)===0) {
+                    const key=`${mr},${mc}`;
+                    if (visited.has(key)) continue;
+                    let nv=new Set(visited); nv.add(key);
+                    let fut=this.findMultiAttacks(er,ec,nv);
+                    if (fut.length) {
+                        for (let p of fut) out.push([[r,c],[er,ec],...p.slice(1)]);
+                    } else {
+                        out.push([[r,c],[er,ec]]);
+                    }
+                }
+            } else {
+                // king: long‐range capture
+                let i=1;
+                while (true) {
+                    const mr=r+i*dr, mc=c+i*dc;
+                    if (mr<0||mr>7||mc<0||mc>7) break;
+                    const midVal=this.board.get(mr,mc);
+                    if (midVal===0) { i++; continue; }
+                    if (!enemy(midVal)) break;
+                    let j=1;
+                    while (true) {
+                        const er=mr+j*dr, ec=mc+j*dc;
+                        if (er<0||er>7||ec<0||ec>7) break;
+                        if (this.board.get(er,ec)!==0) break;
+                        const key=`${mr},${mc}`;
+                        if (!visited.has(key)) {
+                            let nv=new Set(visited); nv.add(key);
+                            let fut=this.findMultiAttacks(er,ec,nv);
+                            if (fut.length) {
+                                for (let p of fut) out.push([[r,c],[er,ec],...p.slice(1)]);
+                            } else {
+                                out.push([[r,c],[er,ec]]);
+                            }
+                        }
+                        j++;
+                    }
+                    break;
+                }
             }
         }
+
         return out;
     }
+
     hasMandatory(){
         for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-            if(this.board.get(r,c)!==1) continue;
+            const v = this.board.get(r,c);
+            // only white men (1) or white kings (3)
+            if (v !== 1 && v !== 3) continue;
             if(this.findMultiAttacks(r,c).length) return true;
         }
         return false;
     }
-    getMoveChain(start,end){
-        // try capture
-        let chains=this.findMultiAttacks(...start);
-        let c=chains.find(ch=>ch[1][0]===end[0]&&ch[1][1]===end[1]);
-        if(c) return c;
-        // normal
-        if(!this.hasMandatory()){
-            let [r1,c1]=start,[r2,c2]=end;
-            if(this.board.get(r1,c1)===1 && this.board.get(r2,c2)===0
-                && Math.abs(c2-c1)===1 && r2===r1-1){
-                return [[r1,c1],[r2,c2]];
+    getMoveChain(start, end) {
+        // 1) Try a capture chain first
+        let chains = this.findMultiAttacks(...start);
+        let c = chains.find(ch => ch[1][0] === end[0] && ch[1][1] === end[1]);
+        if (c) return c;
+
+        // 2) If no mandatory capture, allow a simple step.
+        if (!this.hasMandatory()) {
+            const [r1, c1] = start;
+            const [r2, c2] = end;
+            const piece = this.board.get(r1, c1);
+            // only allow move if landing square is empty and diagonal distance is 1
+            if (this.board.get(r2, c2) === 0 && Math.abs(c2 - c1) === 1) {
+                // men (1) only go up (r2 === r1-1), kings (3) go either way
+                if ((piece === 1 && r2 === r1 - 1) ||
+                    (piece === 3 && Math.abs(r2 - r1) === 1)) {
+                    return [[r1, c1], [r2, c2]];
+                }
             }
         }
         return null;
@@ -135,7 +269,7 @@ class PlayerLogic {
 // ----------------------
 
 const CANVAS_WIDTH=1024, CANVAS_HEIGHT=768;
-const BOARD_X=20, BOARD_Y=20, BOARD_PIX=580, TILE=BOARD_PIX/8;
+const BOARD_X=5, BOARD_Y=20, BOARD_PIX=580, TILE=BOARD_PIX/8;
 
 const canvas=document.getElementById("gameCanvas");
 const ctx=canvas.getContext("2d");
@@ -147,6 +281,7 @@ const images={
     blackTile:        loadImg("./img/black_block.png"),
     redPiece:         loadImg("./img/white.png"),
     blackPiece:       loadImg("./img/blackPiece.png"),
+    blackPieceKing:   loadImg("./img/blackPieceKing.png"),
     flagImage:        loadImg("./img/flag.png"),
     logo:             loadImg("./img/logo.png"),
     settings:         loadImg("./img/settings_btn.png"),
@@ -160,6 +295,7 @@ const images={
     dificulty_avatar: loadImg("./img/deda.png"),
     menu_button:      loadImg("./img/menu_button.png"),
     whitePiece:       loadImg("./img/whitePiece.png"),
+    whitePieceKing:   loadImg("./img/whitePieceKing.png"),
     play_btn:         loadImg("./img/play_btn.png"),
     new_game_btn:     loadImg("./img/new_game_btn.png"),
     your_score_btn:   loadImg("./img/your_score_btn.png")
@@ -218,10 +354,10 @@ class Piece {
             x=BOARD_X+this.col*TILE;
             y=BOARD_Y+this.row*TILE;
         }
-        let p=5;
+        let p= 5;
         ctx.drawImage(this.img,x+p,y+p,TILE-2*p,TILE-2*p);
         if(this.selected){
-            ctx.strokeStyle="yellow"; ctx.lineWidth=4;
+            ctx.strokeStyle="yellow"; ctx.lineWidth=4; //#c3b3d5
             ctx.strokeRect(x,y,TILE,TILE);
         }
     }
@@ -294,19 +430,48 @@ function runNextAnim(){
 }
 
 function completeCurrentAnim(){
-    let {from,to,capture,value}=currentAnim;
-    // update logic
-    boardLogic.set(...from,0);
-    boardLogic.set(...to,value);
-    if(capture) boardLogic.set(...capture,0);
-    // update UI pieces
-    if(capture){
-        pieces = pieces.filter(x=>!(x.row===capture[0]&&x.col===capture[1]));
+    let { from, to, capture, value } = currentAnim;
+
+    // 1) remove from‐square
+    boardLogic.set(...from, 0);
+
+    // 2) decide if we crown
+    let newVal = value;
+    // black man (2) reaching row 7 → black king (4)
+    if (value === 2 && to[0] === 7) newVal = 4;
+    // white man (1) reaching row 0 → white king (3)
+    if (value === 1 && to[0] === 0) newVal = 3;
+
+    // 3) set into‐square (with crowned value)
+    boardLogic.set(...to, newVal);
+
+    // 4) clear any capture
+    if (capture) boardLogic.set(...capture, 0);
+
+    // 5) remove captured piece from UI
+    if (capture) {
+        pieces = pieces.filter(p =>
+            !(p.row === capture[0] && p.col === capture[1])
+        );
     }
-    // the moving piece already updated its row/col in update()
-    waitingForCompletion=false;
+
+    // 6) update the moving Piece object’s type & img if crowned
+    //    after update(), the piece will have row/to[0], col/to[1]
+    let moved = pieces.find(p => p.row === to[0] && p.col === to[1]);
+    if (moved) {
+        if (newVal === 4) {
+            moved.type = "blackKing";
+            moved.img  = images.blackPieceKing;
+        } else if (newVal === 3) {
+            moved.type = "whiteKing";
+            moved.img  = images.whitePieceKing;
+        }
+    }
+
+    waitingForCompletion = false;
     runNextAnim();
 }
+
 
 function syncPieces(){
     // only called on new game or scene changes
@@ -315,6 +480,8 @@ function syncPieces(){
         let v=boardLogic.get(r,c);
         if(v===1) pieces.push(new Piece(r,c,"white",images.whitePiece));
         if(v===2) pieces.push(new Piece(r,c,"black",images.blackPiece));
+        if(v===3) pieces.push(new Piece(r,c,"whiteKing",images.whitePieceKing));
+        if(v===4) pieces.push(new Piece(r,c,"blackKing",images.blackPieceKing));
     }
 }
 
@@ -400,11 +567,12 @@ canvas.addEventListener("click",e=>{
     }
     if(currentScene==="game"){
         // select
-        let hit=pieces.find(p=>p.isClicked(mx,my)&&p.type==="white");
+        let hit=pieces.find(p=>p.isClicked(mx,my)&&(p.type==="white" || p.type==="whiteKing"));
         if(hit){
-            pieces.forEach(p=>p.selected=false);
-            hit.selected=true;
+            // pieces.forEach(p=>p.selected=false);
+            // hit.selected=true;
             selectedPiece=hit;
+            hit.select();
             return;
         }
         // move
