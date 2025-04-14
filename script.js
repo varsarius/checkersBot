@@ -16,14 +16,16 @@ class Board {
             [0,0,0,0,0,0,0,0],
             [1,0,1,0,1,0,1,0],
             [0,1,0,1,0,1,0,1],
-            [1,0,1,0,1,0,1,0]
+            [1,0,1,0,1,0,1,0],
+            [0,1,0,1,0,1,0,1],
+            //
             // [0,0,0,0,0,0,0,0],
-            // [1,0,1,0,1,0,1,0],
+            // [0,0,1,0,1,0,1,0],
             // [0,0,0,0,0,0,0,0],
+            // [0,0,2,0,2,0,0,0],
             // [0,0,0,0,0,0,0,0],
-            // [0,0,0,0,0,0,0,0],
-            // [0,0,0,0,0,0,0,0],
-            // [0,2,0,2,0,2,0,2],
+            // [0,0,2,0,2,0,0,0],
+            // [0,1,0,0,0,0,0,0],
             // [0,0,0,0,0,0,0,0],
 
 
@@ -307,6 +309,8 @@ const images={
     new_game_btn:     loadImg("./img/new_game_btn.png"),
     your_score_btn:   loadImg("./img/your_score_btn.png"),
     on_off_btn:       loadImg("./img/on_off_btn.png"),
+    whiteFlag: loadImg("./img/white-flag.png"),
+    trophy: loadImg("./img/trophy.png"),
 };
 function loadImg(src){ let i=new Image(); i.src=src; return i; }
 
@@ -530,7 +534,7 @@ const buttons=[
     new Button(canvas.width/2-150,canvas.height/2+92,300,70,"New Game","menu",()=>{
         boardLogic=new Board(); aiLogic=new AI(boardLogic); plLogic=new PlayerLogic(boardLogic); syncPieces(); switchScene("game");
     },images.new_game_btn,40,"#A6BFDB","#6A8CBB"),
-    new Button(canvas.width/2-150,canvas.height/2+184,300,70,"Your Score","menu",()=>switchScene("game"),images.your_score_btn,40,"#A6BFDB","#6A8CBB"),
+    new Button(canvas.width/2-150,canvas.height/2+184,300,70,"Your Score","menu",()=>switchScene("score"),images.your_score_btn,40,"#A6BFDB","#6A8CBB"),
 
     new Button(canvas.width-170,20,150,150,"Flag","game",()=>switchScene("menu"),images.logo),
     new Button(canvas.width/2+150,270,350,100,"Difficulty","game",null,images.difficulty),
@@ -542,6 +546,14 @@ const buttons=[
 
 
     new Button(canvas.width/2-20,canvas.height/2-40,270,100,"on_sound_setting","settings",()=>console.log("clicked on volume_setting"),images.on_off_btn),
+
+    new Button(
+        260, 600, 400, 80, "Go Back", "score",
+        () => {
+            switchScene("menu");
+        },
+        null, 50, "#C1DFFB", "#99B9D7"
+    ),
 ];
 
 function switchScene(s){
@@ -586,7 +598,117 @@ function gameLoop(ts){
         ctx.drawImage(images.dificulty_avatar,canvas.width/2+150,220,90,150);
         drawProgress();
     } else if (currentScene==="settings"){
+        drawBoard();
+    } else if (currentScene === "score") {
+        // Фон
+        ctx.fillStyle = "#C9DEF2";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        // Заголовок "SCORE"
+        ctx.fillStyle = "#FFFFFF";
+        ctx.strokeStyle = "#78A3CB";
+        ctx.lineWidth = 8;
+        ctx.font = "bold 80px Caprasimo, Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("SCORE", canvas.width / 2, 60);
+        ctx.strokeText("SCORE", canvas.width / 2, 60);
+
+        // Окно статистики (слева)
+        ctx.fillStyle = "#EDEDED";
+        ctx.strokeStyle = "#A7AEB6";
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.roundRect(50, 100, 400, 400, 30);
+        ctx.fill();
+        ctx.stroke();
+
+        // Заголовок "Your Statistics"
+        ctx.fillStyle = "#FFFFFF";
+        ctx.strokeStyle = "#78A3CB";
+        ctx.lineWidth = 5;
+        ctx.font = "bold 40px Caprasimo, Arial";
+        ctx.fillText("Your Statistics", 250, 150);
+        ctx.strokeText("Your Statistics", 250, 150);
+
+        // Полосы побед/поражений
+        const history = [
+            {text: "Loser!", color: "#EDBEBE", y: 220, icon: images.whiteFlag},
+            {text: "Winner!", color: "#ECF9A6", y: 280, icon: images.trophy},
+            {text: "Loser!", color: "#EDBEBE", y: 340, icon: images.whiteFlag},
+            {text: "Winner!", color: "#ECF9A6", y: 400, icon: images.trophy},
+        ];
+
+        history.forEach(item => {
+            ctx.fillStyle = item.color;
+            ctx.beginPath();
+            ctx.roundRect(80, item.y, 340, 50, 10);
+            ctx.fill();
+
+            ctx.fillStyle = item.text === "Winner!" ? "#8F8D7D" : "#FFFFFF";
+            ctx.strokeStyle = item.text === "Winner!" ? "#FFFFFF" : "#9E9E9E";
+            ctx.lineWidth = 3;
+            ctx.font = "bold 32px Caprasimo, Arial";
+            ctx.fillText(item.text, 250, item.y + 25);
+            ctx.strokeText(item.text, 250, item.y + 25);
+
+            if (item.icon) {
+                ctx.drawImage(item.icon, 60, item.y + 5, 40, 40);
+            }
+        });
+
+        // Полоса прокрутки
+        ctx.fillStyle = "#FBFBFB";
+        ctx.beginPath();
+        ctx.roundRect(460, 200, 20, 240, 20);
+        ctx.fill();
+        ctx.fillStyle = "#D6D6D6";
+        ctx.beginPath();
+        ctx.roundRect(460, 200, 20, 80, 20);
+        ctx.fill();
+
+        // Окно общих побед (справа)
+        ctx.fillStyle = "#EDEDED";
+        ctx.strokeStyle = "#A7AEB6";
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.roundRect(520, 100, 400, 400, 30);
+        ctx.fill();
+        ctx.stroke();
+
+        // Заголовок "Total wins"
+        ctx.fillStyle = "#FFFFFF";
+        ctx.strokeStyle = "#78A3CB";
+        ctx.lineWidth = 5;
+        ctx.font = "bold 40px Caprasimo, Arial";
+        ctx.fillText("Total wins", 720, 150);
+        ctx.strokeText("Total wins", 720, 150);
+
+        // Блоки сложностей
+        const wins = [
+            {text: "Hard 10", color: "#E39E9E", border: "#BE7272", y: 220},
+            {text: "Medium 25", color: "#99B9D7", border: "#547CA1", y: 300},
+            {text: "Easy 30", color: "#C6D08B", border: "#92986E", y: 380},
+        ];
+
+        wins.forEach((item, index) => {
+            ctx.fillStyle = item.color;
+            ctx.strokeStyle = "#FFFFFF";
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.roundRect(560, item.y, 260, 70, 20);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = "#FFFFFF";
+            ctx.strokeStyle = item.border;
+            ctx.lineWidth = 4;
+            ctx.font = "bold 28px Caprasimo, Arial";
+            ctx.fillText(item.text, 690, item.y + 35);
+            ctx.strokeText(item.text, 690, item.y + 35);
+
+            ctx.drawImage(images.trophy, 860, item.y + 15, 40, 40);
+        });
     }
     requestAnimationFrame(gameLoop);
 }
